@@ -59,7 +59,9 @@ func TestHandleWriteRejectsTooManyBitValues(t *testing.T) {
 }
 
 func TestHandleWriteRejectsTooLargeBody(t *testing.T) {
-	body := `{"values":[` + strings.TrimRight(strings.Repeat("1,", maxWriteBody), ",") + `]}`
+	prefix := `{"values":"`
+	suffix := `"}`
+	body := prefix + strings.Repeat("a", maxWriteBody+1-len(prefix)-len(suffix)) + suffix
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 

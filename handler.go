@@ -161,7 +161,7 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			var maxBytesErr *http.MaxBytesError
 			if errors.As(err, &maxBytesErr) {
-				writeErr(w, http.StatusRequestEntityTooLarge, "bad_request", "body must not be larger than 1 MiB")
+				writeErr(w, http.StatusRequestEntityTooLarge, "bad_request", "body must not be larger than "+strconv.FormatInt(maxBytesErr.Limit, 10)+" bytes")
 				return
 			}
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
