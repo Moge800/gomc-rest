@@ -9,6 +9,12 @@ import (
 	mc "github.com/moge800/gomcprotocol"
 )
 
+const (
+	maxReadCount   = 1024
+	maxWriteValues = 1024
+	maxWriteBody   = 1 << 20
+)
+
 // writeJSON writes v as JSON with the given status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -60,6 +66,11 @@ func handleHealth(plc *PLCClient) http.HandlerFunc {
 // GET /read?addr=D100&count=5
 func handleRead(plc *PLCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeErr(w, http.StatusMethodNotAllowed, "bad_request", "GET required")
+			return
+		}
+
 		addrStr := r.URL.Query().Get("addr")
 		if addrStr == "" {
 			writeErr(w, http.StatusBadRequest, "bad_request", "addr is required")
@@ -74,6 +85,10 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 				return
 			}
 			count = n
+		}
+		if count > maxReadCount {
+			writeErr(w, http.StatusBadRequest, "bad_request", "count must be 1024 or less")
+			return
 		}
 
 		da, err := parseAddr(addrStr)
@@ -135,6 +150,7 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 		var body struct {
 			Values json.RawMessage `json:"values"`
 		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxWriteBody)
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 			return
@@ -154,6 +170,10 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 				writeErr(w, http.StatusBadRequest, "bad_request", "values must not be empty")
 				return
 			}
+			if len(vals) > maxWriteValues {
+				writeErr(w, http.StatusBadRequest, "bad_request", "values must contain 1024 items or less")
+				return
+			}
 			if err := plc.do(func(c *mc.Client3E) error {
 				return c.WriteWords(da.Device, da.Addr, vals)
 			}); err != nil {
@@ -168,6 +188,10 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 			}
 			if len(vals) == 0 {
 				writeErr(w, http.StatusBadRequest, "bad_request", "values must not be empty")
+				return
+			}
+			if len(vals) > maxWriteValues {
+				writeErr(w, http.StatusBadRequest, "bad_request", "values must contain 1024 items or less")
 				return
 			}
 			if err := plc.do(func(c *mc.Client3E) error {

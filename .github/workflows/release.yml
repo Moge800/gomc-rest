@@ -23,7 +23,12 @@ jobs:
       - name: Build (Windows amd64)
         run: GOOS=windows GOARCH=amd64 go build -o gomc-rest.exe .
 
+      - name: Generate checksums
+        run: sha256sum gomc-rest.exe > checksums.txt
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: gomc-rest.exe
+          files: |
+            gomc-rest.exe
+            checksums.txt
