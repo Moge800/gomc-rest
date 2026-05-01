@@ -57,7 +57,14 @@ func main() {
 	mux.HandleFunc("/remote/latch-clear", handleRemoteLatchClear(plc))
 	mux.HandleFunc("/remote/reset", handleRemoteReset(plc))
 
-	srv := &http.Server{Addr: *listen, Handler: mux}
+	srv := &http.Server{
+		Addr:              *listen,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

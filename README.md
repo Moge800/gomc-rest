@@ -20,7 +20,7 @@ go build -o gomc-rest .
 ## 設定（フラグ優先・環境変数デフォルト）
 
 | フラグ | 環境変数 | デフォルト |
-|--------|----------|------------|
+| --- | --- | --- |
 | `-host` | `PLC_HOST` | `192.168.0.1` |
 | `-port` | `PLC_PORT` | `5007` |
 | `-mode` | `PLC_MODE` | `binary` |
@@ -31,7 +31,7 @@ go build -o gomc-rest .
 ## エンドポイント
 
 | Method | Path | 説明 |
-|--------|------|------|
+| --- | --- | --- |
 | GET | `/read?addr=D100&count=5` | ワード→int / ビット→bool 自動判定 |
 | POST | `/write?addr=D100` | body: `{"values":[1,2,3]}` or `{"values":[true,false]}` |
 | POST | `/remote/run?clear=0&force=false` | RemoteRun |
@@ -43,11 +43,24 @@ go build -o gomc-rest .
 
 ---
 
+## リクエスト制限
+
+| 対象 | 制限 |
+| --- | --- |
+| `/read` の `count` | `1` 以上 `1024` 以下 |
+| `/write` の `values` | 1 点以上 `1024` 点以下 |
+| `/write` の body | 1 MiB 以下 |
+
+ワードデバイスへ書き込む各値は `0..65535` の範囲です。ビットデバイスへ書き込む値は真偽値です。
+
+---
+
 ## エラーレスポンス
 
 | 状態 | HTTP | code |
-|------|------|------|
+| --- | --- | --- |
 | パラメータ不正 | 400 | `bad_request` |
+| body サイズ超過 | 413 | `bad_request` |
 | PLC エラー (end code) | 502 | `plc_error` |
 | 接続エラー | 503 | `connection_error` |
 | `/health` は常に | 200 | — |
