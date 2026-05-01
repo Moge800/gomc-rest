@@ -27,6 +27,10 @@ Download the latest `gomc-rest.exe` from the [Releases](https://github.com/Moge8
 
 On startup, the server attempts to connect to the PLC. If the PLC is not reachable, startup continues and the server retries on the first PLC request.
 
+## Network Scope
+
+This server is intended only for FA local networks, such as an isolated factory LAN, a trusted machine network, or localhost access from an operator PC. Do not expose it to the Internet, an office LAN, or any untrusted network. The API can read, write, run, stop, pause, latch-clear, and reset a PLC, and it does not provide authentication, authorization, TLS, or access control.
+
 ## Build from source
 
 ```bash
@@ -67,8 +71,9 @@ All successful write and remote-control operations return:
 
 Notes:
 
-- `count` must be `1` or greater.
-- `values` must be present and must not be empty.
+- `count` must be between `1` and `1024`.
+- `values` must be present, must not be empty, and may contain at most `1024` items.
+- The JSON request body for `/write` is limited to 1 MiB.
 - Word devices require integer values. Bit devices require boolean values.
 - `force` is enabled only when the query value is exactly `true`.
 - `/health` always returns HTTP `200`, even when the PLC is disconnected.
@@ -99,6 +104,7 @@ Errors are returned as JSON.
 
 - PLC requests are serialized through one shared client connection.
 - The MC protocol client timeout is set to 5 seconds.
+- The HTTP server uses request timeouts to avoid stalled clients.
 - If initial connection fails, the HTTP server still starts.
 - If there is no active connection, the next PLC request attempts to reconnect.
 - Connection-level MC protocol errors clear the connection so a later request can reconnect.
