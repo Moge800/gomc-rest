@@ -27,6 +27,15 @@ func writeErr(w http.ResponseWriter, status int, code, msg string) {
 	writeJSON(w, status, body)
 }
 
+func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method == method {
+		return true
+	}
+	w.Header().Set("Allow", method)
+	writeErr(w, http.StatusMethodNotAllowed, "bad_request", method+" required")
+	return false
+}
+
 func writePLCErr(w http.ResponseWriter, err error) {
 	var connErr *connErrWrap
 	var plcErr *mc.MCProtocolError
@@ -66,8 +75,7 @@ func handleHealth(plc *PLCClient) http.HandlerFunc {
 // GET /read?addr=D100&count=5
 func handleRead(plc *PLCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			writeErr(w, http.StatusMethodNotAllowed, "bad_request", "GET required")
+		if !requireMethod(w, r, http.MethodGet) {
 			return
 		}
 
@@ -87,7 +95,7 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 			count = n
 		}
 		if count > maxReadCount {
-			writeErr(w, http.StatusBadRequest, "bad_request", "count must be 1024 or less")
+			writeErr(w, http.StatusBadRequest, "bad_request", "count must be "+strconv.Itoa(maxReadCount)+" or less")
 			return
 		}
 
@@ -130,8 +138,7 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 // POST /write?addr=D100   body: {"values":[1,2,3]} or {"values":[true,false]}
 func handleWrite(plc *PLCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeErr(w, http.StatusMethodNotAllowed, "bad_request", "POST required")
+		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
 
@@ -152,6 +159,11 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, maxWriteBody)
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				writeErr(w, http.StatusRequestEntityTooLarge, "bad_request", "body must not be larger than 1 MiB")
+				return
+			}
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 			return
 		}
@@ -171,7 +183,7 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 				return
 			}
 			if len(vals) > maxWriteValues {
-				writeErr(w, http.StatusBadRequest, "bad_request", "values must contain 1024 items or less")
+				writeErr(w, http.StatusBadRequest, "bad_request", "values must contain "+strconv.Itoa(maxWriteValues)+" items or less")
 				return
 			}
 			if err := plc.do(func(c *mc.Client3E) error {
@@ -191,7 +203,7 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 				return
 			}
 			if len(vals) > maxWriteValues {
-				writeErr(w, http.StatusBadRequest, "bad_request", "values must contain 1024 items or less")
+				writeErr(w, http.StatusBadRequest, "bad_request", "values must contain "+strconv.Itoa(maxWriteValues)+" items or less")
 				return
 			}
 			if err := plc.do(func(c *mc.Client3E) error {
@@ -209,8 +221,7 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 // POST /remote/run?clear=0&force=false
 func handleRemoteRun(plc *PLCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeErr(w, http.StatusMethodNotAllowed, "bad_request", "POST required")
+		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
 		clear := 0
@@ -237,8 +248,7 @@ func handleRemoteRun(plc *PLCClient) http.HandlerFunc {
 // POST /remote/stop
 func handleRemoteStop(plc *PLCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeErr(w, http.StatusMethodNotAllowed, "bad_request", "POST required")
+		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
 		if err := plc.do(func(c *mc.Client3E) error {
@@ -254,8 +264,7 @@ func handleRemoteStop(plc *PLCClient) http.HandlerFunc {
 // POST /remote/pause?force=false
 func handleRemotePause(plc *PLCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeErr(w, http.StatusMethodNotAllowed, "bad_request", "POST required")
+		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
 		force := r.URL.Query().Get("force") == "true"
@@ -272,8 +281,7 @@ func handleRemotePause(plc *PLCClient) http.HandlerFunc {
 // POST /remote/latch-clear
 func handleRemoteLatchClear(plc *PLCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeErr(w, http.StatusMethodNotAllowed, "bad_request", "POST required")
+		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
 		if err := plc.do(func(c *mc.Client3E) error {
@@ -289,8 +297,7 @@ func handleRemoteLatchClear(plc *PLCClient) http.HandlerFunc {
 // POST /remote/reset
 func handleRemoteReset(plc *PLCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeErr(w, http.StatusMethodNotAllowed, "bad_request", "POST required")
+		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
 		if err := plc.doReset(); err != nil {
