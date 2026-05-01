@@ -17,7 +17,7 @@ PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使�
 
 ## ダウンロード
 
-[Releases](https://github.com/Moge800/gomc-rest/releases) ページから最新の `gomc-rest.exe` をダウンロードしてください。
+[Releases](https://github.com/moge800/gomc-rest/releases) ページから最新の `gomc-rest.exe` をダウンロードしてください。
 
 ## 実行
 
@@ -74,7 +74,7 @@ go build -o gomc-rest .
 - `count` は `1` 以上 `1024` 以下である必要があります。
 - `values` は必須で、空配列は使用できず、最大 `1024` 点までです。
 - `/write` の JSON request body は 1 MiB までです。
-- ワードデバイスには整数配列、ビットデバイスには真偽値配列を指定します。
+- ワードデバイスには `0..65535` の整数配列、ビットデバイスには真偽値配列を指定します。
 - `force` は query の値が厳密に `true` のときだけ有効です。
 - `/health` は PLC 未接続時でも常に HTTP `200` を返します。
 - `/remote/reset` は PLC 側で TCP 接続が閉じられるため、実行後に接続をクリアします。
@@ -96,7 +96,7 @@ go build -o gomc-rest .
 
 | 状態 | HTTP | `code` | 例 |
 | --- | --- | --- | --- |
-| パラメータ、body、アドレス、count、method が不正 | `400` または `405` | `bad_request` | `{"error":"addr is required","code":"bad_request"}` |
+| パラメータ、body、アドレス、count が不正、または POST 専用エンドポイントで method が不正 | `400` または `405` | `bad_request` | `{"error":"addr is required","code":"bad_request"}` |
 | PLC の MC プロトコルエラー、end code あり | `502` | `plc_error` | `{"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
 | PLC 接続エラー | `503` | `connection_error` | `{"error":"connect: refused","code":"connection_error"}` |
 

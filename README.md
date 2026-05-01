@@ -17,7 +17,7 @@ The PLC transport is provided by [gomcprotocol](https://github.com/moge800/gomcp
 
 ## Download
 
-Download the latest `gomc-rest.exe` from the [Releases](https://github.com/Moge800/gomc-rest/releases) page.
+Download the latest `gomc-rest.exe` from the [Releases](https://github.com/moge800/gomc-rest/releases) page.
 
 ## Run
 
@@ -74,7 +74,7 @@ Notes:
 - `count` must be between `1` and `1024`.
 - `values` must be present, must not be empty, and may contain at most `1024` items.
 - The JSON request body for `/write` is limited to 1 MiB.
-- Word devices require integer values. Bit devices require boolean values.
+- Word devices require integer values in the range `0..65535`. Bit devices require boolean values.
 - `force` is enabled only when the query value is exactly `true`.
 - `/health` always returns HTTP `200`, even when the PLC is disconnected.
 - `/remote/reset` clears the TCP connection because the PLC closes it after reset.
@@ -96,7 +96,7 @@ Errors are returned as JSON.
 
 | Scenario | HTTP | `code` | Example |
 | --- | --- | --- | --- |
-| Invalid parameter, body, address, count, or method | `400` or `405` | `bad_request` | `{"error":"addr is required","code":"bad_request"}` |
+| Invalid parameter, body, address, or count; invalid method on POST-only endpoints | `400` or `405` | `bad_request` | `{"error":"addr is required","code":"bad_request"}` |
 | PLC MC protocol error with an end code | `502` | `plc_error` | `{"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
 | PLC connection error | `503` | `connection_error` | `{"error":"connect: refused","code":"connection_error"}` |
 
