@@ -19,6 +19,8 @@ The PLC transport is provided by [gomcprotocol](https://github.com/moge800/gomcp
 
 Download the latest `gomc-rest.exe` from the [Releases](https://github.com/moge800/gomc-rest/releases) page.
 
+Published releases provide the Windows binary as `gomc-rest.exe`. Source builds use the output name from the build command below.
+
 ## Run
 
 ```bash
@@ -60,12 +62,12 @@ All successful write and remote-control operations return:
 
 | Method | Path | Parameters / body | Response |
 | --- | --- | --- | --- |
-| `GET` | `/health` | none | `{"status":"ok","connected":true}` or `{"status":"disconnected","connected":false}` |
-| `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1` | `{"values":[100,200]}` or `{"values":[true,false]}` |
+| `GET` recommended, not enforced | `/health` | none | `{"status":"ok","connected":true}` or `{"status":"disconnected","connected":false}` |
+| `GET` recommended, not enforced | `/read` | query: `addr` required, `count` optional and defaults to `1` | `{"values":[100,200]}` or `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` required; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
-| `POST` | `/remote/run` | query: `clear=0|1|2` optional, `force=true|false` optional | `{"ok":true}` |
+| `POST` | `/remote/run` | query: `clear=0/1/2` optional, `force=true/false` optional | `{"ok":true}` |
 | `POST` | `/remote/stop` | none | `{"ok":true}` |
-| `POST` | `/remote/pause` | query: `force=true|false` optional | `{"ok":true}` |
+| `POST` | `/remote/pause` | query: `force=true/false` optional | `{"ok":true}` |
 | `POST` | `/remote/latch-clear` | none | `{"ok":true}` |
 | `POST` | `/remote/reset` | none | `{"ok":true}` |
 

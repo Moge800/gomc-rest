@@ -19,6 +19,8 @@ PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使�
 
 [Releases](https://github.com/moge800/gomc-rest/releases) ページから最新の `gomc-rest.exe` をダウンロードしてください。
 
+公開リリースでは Windows 用バイナリ名を `gomc-rest.exe` としています。ソースからビルドする場合は、下記のビルドコマンドで指定した出力名になります。
+
 ## 実行
 
 ```bash
@@ -60,12 +62,12 @@ go build -o gomc-rest .
 
 | Method | Path | パラメータ / body | レスポンス |
 | --- | --- | --- | --- |
-| `GET` | `/health` | なし | `{"status":"ok","connected":true}` または `{"status":"disconnected","connected":false}` |
-| `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1` | `{"values":[100,200]}` または `{"values":[true,false]}` |
+| `GET` 推奨、未強制 | `/health` | なし | `{"status":"ok","connected":true}` または `{"status":"disconnected","connected":false}` |
+| `GET` 推奨、未強制 | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1` | `{"values":[100,200]}` または `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` 必須、body: `{"values":[1,2,3]}` または `{"values":[true,false]}` | `{"ok":true}` |
-| `POST` | `/remote/run` | query: `clear=0|1|2` 任意、`force=true|false` 任意 | `{"ok":true}` |
+| `POST` | `/remote/run` | query: `clear=0/1/2` 任意、`force=true/false` 任意 | `{"ok":true}` |
 | `POST` | `/remote/stop` | なし | `{"ok":true}` |
-| `POST` | `/remote/pause` | query: `force=true|false` 任意 | `{"ok":true}` |
+| `POST` | `/remote/pause` | query: `force=true/false` 任意 | `{"ok":true}` |
 | `POST` | `/remote/latch-clear` | なし | `{"ok":true}` |
 | `POST` | `/remote/reset` | なし | `{"ok":true}` |
 
