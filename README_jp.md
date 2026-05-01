@@ -23,8 +23,16 @@ PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使�
 
 ## 実行
 
+Windows 用リリースバイナリの場合:
+
+```powershell
+.\gomc-rest.exe -host 192.168.0.1 -port 5007 -mode binary -listen :8080
+```
+
+ソースからビルドした場合、または Windows 以外の環境の場合:
+
 ```bash
-./gomc-rest.exe -host 192.168.0.1 -port 5007 -mode binary -listen :8080
+./gomc-rest -host 192.168.0.1 -port 5007 -mode binary -listen :8080
 ```
 
 起動時に PLC への接続を試行します。PLC に到達できない場合でも起動は継続し、最初の PLC 要求時に再接続します。
@@ -63,7 +71,7 @@ go build -o gomc-rest .
 | Method | Path | パラメータ / body | レスポンス |
 | --- | --- | --- | --- |
 | `GET` 推奨、未強制 | `/health` | なし | `{"status":"ok","connected":true}` または `{"status":"disconnected","connected":false}` |
-| `GET` 推奨、未強制 | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1` | `{"values":[100,200]}` または `{"values":[true,false]}` |
+| `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1` | `{"values":[100,200]}` または `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` 必須、body: `{"values":[1,2,3]}` または `{"values":[true,false]}` | `{"ok":true}` |
 | `POST` | `/remote/run` | query: `clear=0/1/2` 任意、`force=true/false` 任意 | `{"ok":true}` |
 | `POST` | `/remote/stop` | なし | `{"ok":true}` |
@@ -73,8 +81,9 @@ go build -o gomc-rest .
 
 補足:
 
-- `count` は `1` 以上である必要があります。
-- `values` は必須で、空配列は使用できません。
+- `count` は `1` 以上 `1024` 以下である必要があります。
+- `values` は必須で、要素数は `1` 以上 `1024` 以下です。
+- `/write` のリクエスト body は 1 MiB 以下である必要があります。
 - ワードデバイスには `0..65535` の整数配列、ビットデバイスには真偽値配列を指定します。
 - `force` は query の値が厳密に `true` のときだけ有効です。
 - `/health` は PLC 未接続時でも常に HTTP `200` を返します。
@@ -98,6 +107,7 @@ go build -o gomc-rest .
 | 状態 | HTTP | `code` | 例 |
 | --- | --- | --- | --- |
 | パラメータ、body、アドレス、count が不正、または POST 専用エンドポイントで method が不正 | `400` または `405` | `bad_request` | `{"error":"addr is required","code":"bad_request"}` |
+| `/write` の body サイズ超過 | `413` | `bad_request` | `{"error":"body must not be larger than 1048576 bytes","code":"bad_request"}` |
 | PLC の MC プロトコルエラー、end code あり | `502` | `plc_error` | `{"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
 | PLC 接続エラー | `503` | `connection_error` | `{"error":"connect: refused","code":"connection_error"}` |
 

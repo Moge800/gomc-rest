@@ -23,8 +23,16 @@ Published releases provide the Windows binary as `gomc-rest.exe`. Source builds 
 
 ## Run
 
+For the Windows release binary:
+
+```powershell
+.\gomc-rest.exe -host 192.168.0.1 -port 5007 -mode binary -listen :8080
+```
+
+For source builds or non-Windows environments:
+
 ```bash
-./gomc-rest.exe -host 192.168.0.1 -port 5007 -mode binary -listen :8080
+./gomc-rest -host 192.168.0.1 -port 5007 -mode binary -listen :8080
 ```
 
 On startup, the server attempts to connect to the PLC. If the PLC is not reachable, startup continues and the server retries on the first PLC request.
@@ -63,7 +71,7 @@ All successful write and remote-control operations return:
 | Method | Path | Parameters / body | Response |
 | --- | --- | --- | --- |
 | `GET` recommended, not enforced | `/health` | none | `{"status":"ok","connected":true}` or `{"status":"disconnected","connected":false}` |
-| `GET` recommended, not enforced | `/read` | query: `addr` required, `count` optional and defaults to `1` | `{"values":[100,200]}` or `{"values":[true,false]}` |
+| `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1` | `{"values":[100,200]}` or `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` required; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
 | `POST` | `/remote/run` | query: `clear=0/1/2` optional, `force=true/false` optional | `{"ok":true}` |
 | `POST` | `/remote/stop` | none | `{"ok":true}` |
@@ -73,8 +81,9 @@ All successful write and remote-control operations return:
 
 Notes:
 
-- `count` must be `1` or greater.
-- `values` must be present and must not be empty.
+- `count` must be between `1` and `1024`.
+- `values` must be present and contain between `1` and `1024` items.
+- The `/write` request body must be 1 MiB or smaller.
 - Word devices require integer values in the range `0..65535`. Bit devices require boolean values.
 - `force` is enabled only when the query value is exactly `true`.
 - `/health` always returns HTTP `200`, even when the PLC is disconnected.
@@ -97,7 +106,8 @@ Errors are returned as JSON.
 
 | Scenario | HTTP | `code` | Example |
 | --- | --- | --- | --- |
-| Invalid parameter, body, address, or count; invalid method on POST-only endpoints | `400` or `405` | `bad_request` | `{"error":"addr is required","code":"bad_request"}` |
+| Invalid parameter, body, address, count, or method | `400` or `405` | `bad_request` | `{"error":"addr is required","code":"bad_request"}` |
+| `/write` body is too large | `413` | `bad_request` | `{"error":"body must not be larger than 1048576 bytes","code":"bad_request"}` |
 | PLC MC protocol error with an end code | `502` | `plc_error` | `{"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
 | PLC connection error | `503` | `connection_error` | `{"error":"connect: refused","code":"connection_error"}` |
 
