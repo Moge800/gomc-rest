@@ -39,7 +39,7 @@ go build -o gomc-rest .
 | POST | `/remote/pause?force=false` | RemotePause |
 | POST | `/remote/latch-clear` | RemoteLatchClear |
 | POST | `/remote/reset` | RemoteReset |
-| GET | `/health` | `{"status":"ok","connected":true}` |
+| GET | `/health` | 接続中: `{"status":"ok","connected":true}` / 未接続: `{"status":"disconnected","connected":false}` |
 
 ---
 
