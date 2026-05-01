@@ -15,6 +15,19 @@ The PLC transport is provided by [gomcprotocol](https://github.com/moge800/gomcp
 - Keep a simple health endpoint that reports the current connection state.
 - Retry the PLC connection on demand when startup connection fails or a previous connection was cleared.
 
+## Network Scope
+
+**⚠️ Caution: Do not expose this server to the Internet, an office LAN, or any untrusted network.**
+
+This server is intended only for FA local networks, such as an isolated factory LAN, a trusted machine network, or localhost access from an operator PC. The API can read, write, run, stop, pause, latch-clear, and reset a PLC, and it does not provide authentication, authorization, TLS, or access control.
+
+Recommended deployment:
+
+- Run it inside an isolated FA network or on `localhost` only.
+- Restrict access with network segmentation, firewall rules, or host-level controls.
+- Use `-listen 127.0.0.1:8080` when only local access is required.
+- Do not place it behind a public reverse proxy or expose it through port forwarding.
+
 ## Download
 
 Download the latest `gomc-rest.exe` from the [Releases](https://github.com/moge800/gomc-rest/releases) page.
@@ -36,19 +49,6 @@ For source builds or non-Windows environments:
 ```
 
 On startup, the server attempts to connect to the PLC. If the PLC is not reachable, startup continues and the server retries on the first PLC request.
-
-## Network Scope
-
-**⚠️ Caution: Do not expose this server to the Internet, an office LAN, or any untrusted network.**
-
-This server is intended only for FA local networks, such as an isolated factory LAN, a trusted machine network, or localhost access from an operator PC. The API can read, write, run, stop, pause, latch-clear, and reset a PLC, and it does not provide authentication, authorization, TLS, or access control.
-
-Recommended deployment:
-
-- Run it inside an isolated FA network or on `localhost` only.
-- Restrict access with network segmentation, firewall rules, or host-level controls.
-- Use `-listen 127.0.0.1:8080` when only local access is required.
-- Do not place it behind a public reverse proxy or expose it through port forwarding.
 
 ## Build from source
 
