@@ -71,9 +71,8 @@ All successful write and remote-control operations return:
 
 Notes:
 
-- `count` must be between `1` and `1024`.
-- `values` must be present, must not be empty, and may contain at most `1024` items.
-- The JSON request body for `/write` is limited to 1 MiB.
+- `count` must be `1` or greater.
+- `values` must be present and must not be empty.
 - Word devices require integer values in the range `0..65535`. Bit devices require boolean values.
 - `force` is enabled only when the query value is exactly `true`.
 - `/health` always returns HTTP `200`, even when the PLC is disconnected.
@@ -104,7 +103,6 @@ Errors are returned as JSON.
 
 - PLC requests are serialized through one shared client connection.
 - The MC protocol client timeout is set to 5 seconds.
-- The HTTP server uses request timeouts to avoid stalled clients.
 - If initial connection fails, the HTTP server still starts.
 - If there is no active connection, the next PLC request attempts to reconnect.
 - Connection-level MC protocol errors clear the connection so a later request can reconnect.
