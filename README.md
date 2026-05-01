@@ -1,13 +1,33 @@
 # gomc-rest
 
-三菱電機 PLC（MC プロトコル 3E フレーム）向けの REST API サーバー。
-`D100` のようなデバイス文字列で読み書きでき、ワード→int / ビット→bool を自動変換した JSON を返す。
+[日本語 README](README_jp.md)
 
-依存: [gomcprotocol](https://github.com/moge800/gomcprotocol)（標準ライブラリのみ、外部フレームワークなし）
+`gomc-rest` is a small REST API server for Mitsubishi Electric PLCs using the MC protocol 3E frame. It lets HTTP clients read and write PLC devices such as `D100` or `M0`, returning JSON values with automatic conversion: word devices become integers and bit devices become booleans.
 
----
+The PLC transport is provided by [gomcprotocol](https://github.com/moge800/gomcprotocol). The server uses only the Go standard library for HTTP handling.
 
-## ビルド
+## Features
+
+- Read word and bit devices through a simple `/read` endpoint.
+- Write integer arrays or boolean arrays through `/write`.
+- Run, stop, pause, latch-clear, and reset the PLC remotely.
+- Configure by command-line flags, with environment variables as defaults.
+- Keep a simple health endpoint that reports the current connection state.
+- Retry the PLC connection on demand when startup connection fails or a previous connection was cleared.
+
+## Download
+
+Download the latest `gomc-rest.exe` from the [Releases](https://github.com/Moge800/gomc-rest/releases) page.
+
+## Run
+
+```bash
+./gomc-rest.exe -host 192.168.0.1 -port 5007 -mode binary -listen :8080
+```
+
+On startup, the server attempts to connect to the PLC. If the PLC is not reachable, startup continues and the server retries on the first PLC request.
+
+## Build from source
 
 ```bash
 git clone https://github.com/moge800/gomc-rest
@@ -15,81 +35,94 @@ cd gomc-rest
 go build -o gomc-rest .
 ```
 
----
+## Configuration
 
-## 設定（フラグ優先・環境変数デフォルト）
+Flags take priority. Environment variables provide the default values for those flags.
 
-| フラグ | 環境変数 | デフォルト |
-|--------|----------|------------|
-| `-host` | `PLC_HOST` | `192.168.0.1` |
-| `-port` | `PLC_PORT` | `5007` |
-| `-mode` | `PLC_MODE` | `binary` |
-| `-listen` | `LISTEN_ADDR` | `:8080` |
+| Flag | Environment variable | Default | Notes |
+| --- | --- | --- | --- |
+| `-host` | `PLC_HOST` | `192.168.0.1` | PLC host or IP address |
+| `-port` | `PLC_PORT` | `5007` | PLC port, `1` to `65535` |
+| `-mode` | `PLC_MODE` | `binary` | `binary` or `ascii` |
+| `-listen` | `LISTEN_ADDR` | `:8080` | HTTP listen address |
 
----
+## API Reference
 
-## エンドポイント
-
-| Method | Path | 説明 |
-|--------|------|------|
-| GET | `/read?addr=D100&count=5` | ワード→int / ビット→bool 自動判定 |
-| POST | `/write?addr=D100` | body: `{"values":[1,2,3]}` or `{"values":[true,false]}` |
-| POST | `/remote/run?clear=0&force=false` | RemoteRun |
-| POST | `/remote/stop` | RemoteStop |
-| POST | `/remote/pause?force=false` | RemotePause |
-| POST | `/remote/latch-clear` | RemoteLatchClear |
-| POST | `/remote/reset` | RemoteReset |
-| GET | `/health` | 接続中: `{"status":"ok","connected":true}` / 未接続: `{"status":"disconnected","connected":false}` |
-
----
-
-## エラーレスポンス
-
-| 状態 | HTTP | code |
-|------|------|------|
-| パラメータ不正 | 400 | `bad_request` |
-| PLC エラー (end code) | 502 | `plc_error` |
-| 接続エラー | 503 | `connection_error` |
-| `/health` は常に | 200 | — |
+All successful write and remote-control operations return:
 
 ```json
-{"error": "MC error 0x4000", "code": "plc_error",        "end_code": "0x4000"}
-{"error": "connect: refused", "code": "connection_error"}
-{"error": "invalid addr",     "code": "bad_request"}
+{"ok":true}
 ```
 
----
+| Method | Path | Parameters / body | Response |
+| --- | --- | --- | --- |
+| `GET` | `/health` | none | `{"status":"ok","connected":true}` or `{"status":"disconnected","connected":false}` |
+| `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1` | `{"values":[100,200]}` or `{"values":[true,false]}` |
+| `POST` | `/write` | query: `addr` required; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
+| `POST` | `/remote/run` | query: `clear=0|1|2` optional, `force=true|false` optional | `{"ok":true}` |
+| `POST` | `/remote/stop` | none | `{"ok":true}` |
+| `POST` | `/remote/pause` | query: `force=true|false` optional | `{"ok":true}` |
+| `POST` | `/remote/latch-clear` | none | `{"ok":true}` |
+| `POST` | `/remote/reset` | none | `{"ok":true}` |
 
-## 動作確認
+Notes:
+
+- `count` must be `1` or greater.
+- `values` must be present and must not be empty.
+- Word devices require integer values. Bit devices require boolean values.
+- `force` is enabled only when the query value is exactly `true`.
+- `/health` always returns HTTP `200`, even when the PLC is disconnected.
+- `/remote/reset` clears the TCP connection because the PLC closes it after reset.
+
+## Device Addressing
+
+Device addresses are case-insensitive and may include surrounding whitespace. The device prefix determines whether the API reads or writes words or bits.
+
+| Type | Devices | JSON value type | Examples |
+| --- | --- | --- | --- |
+| Word | `D`, `W`, `R`, `ZR`, `TN`, `CN`, `Z`, `SW`, `SD` | integer | `D100`, `ZR512`, `SW5` |
+| Bit | `X`, `Y`, `M`, `L`, `B`, `F`, `SB`, `SM` | boolean | `M0`, `X10`, `SB10` |
+
+The numeric address must be a non-negative integer. Unknown devices, missing numbers, non-numeric numbers, and negative numbers return `400 bad_request`.
+
+## Error Responses
+
+Errors are returned as JSON.
+
+| Scenario | HTTP | `code` | Example |
+| --- | --- | --- | --- |
+| Invalid parameter, body, address, count, or method | `400` or `405` | `bad_request` | `{"error":"addr is required","code":"bad_request"}` |
+| PLC MC protocol error with an end code | `502` | `plc_error` | `{"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
+| PLC connection error | `503` | `connection_error` | `{"error":"connect: refused","code":"connection_error"}` |
+
+## Connection Behavior
+
+- PLC requests are serialized through one shared client connection.
+- The MC protocol client timeout is set to 5 seconds.
+- If initial connection fails, the HTTP server still starts.
+- If there is no active connection, the next PLC request attempts to reconnect.
+- Connection-level MC protocol errors clear the connection so a later request can reconnect.
+
+## Examples
+
+The `/health` endpoint can be used without a PLC. The other examples require a reachable PLC.
 
 ```bash
-./gomc-rest -host 192.168.0.1 -port 5007
-
-# 疎通（実機なしでも返る）
 curl http://localhost:8080/health
-# → {"connected":false,"status":"disconnected"}
-
-# ワード読み
 curl "http://localhost:8080/read?addr=D100&count=3"
-# → {"values":[100,200,300]}
-
-# ビット読み
 curl "http://localhost:8080/read?addr=M0&count=4"
-# → {"values":[true,false,true,false]}
 
-# ワード書き
 curl -X POST "http://localhost:8080/write?addr=D100" \
   -H "Content-Type: application/json" \
   -d '{"values":[10,20,30]}'
-# → {"ok":true}
 
-# ビット書き
 curl -X POST "http://localhost:8080/write?addr=M0" \
   -H "Content-Type: application/json" \
   -d '{"values":[true,false]}'
-# → {"ok":true}
 
-# RemoteRun
-curl -X POST "http://localhost:8080/remote/run"
-# → {"ok":true}
+curl -X POST "http://localhost:8080/remote/run?clear=0&force=false"
+curl -X POST "http://localhost:8080/remote/stop"
+curl -X POST "http://localhost:8080/remote/pause?force=false"
+curl -X POST "http://localhost:8080/remote/latch-clear"
+curl -X POST "http://localhost:8080/remote/reset"
 ```
