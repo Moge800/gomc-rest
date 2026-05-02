@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -113,8 +114,14 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 			return
 		}
 
-		if dword && !isWordDevice(da.Device) {
-			writeErr(w, http.StatusBadRequest, "bad_request", "dword is only supported for word devices")
+		sint := r.URL.Query().Get("sint") == "true"
+
+		if (dword || sint) && !isWordDevice(da.Device) {
+			if dword {
+				writeErr(w, http.StatusBadRequest, "bad_request", "dword is only supported for word devices")
+			} else {
+				writeErr(w, http.StatusBadRequest, "bad_request", "sint is only supported for word devices")
+			}
 			return
 		}
 
@@ -137,13 +144,22 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 				for i := range vals {
 					lo := uint32(words[i*2])
 					hi := uint32(words[i*2+1])
-					vals[i] = int64(lo | hi<<16)
+					combined := lo | hi<<16
+					if sint {
+						vals[i] = int64(int32(combined))
+					} else {
+						vals[i] = int64(combined)
+					}
 				}
 				writeJSON(w, http.StatusOK, map[string]any{"values": vals})
 			} else {
 				vals := make([]int, len(words))
 				for i, v := range words {
-					vals[i] = int(v)
+					if sint {
+						vals[i] = int(int16(v))
+					} else {
+						vals[i] = int(v)
+					}
 				}
 				writeJSON(w, http.StatusOK, map[string]any{"values": vals})
 			}
@@ -183,9 +199,14 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 		}
 
 		dword := r.URL.Query().Get("dword") == "true"
+		sint := r.URL.Query().Get("sint") == "true"
 
-		if dword && !isWordDevice(da.Device) {
-			writeErr(w, http.StatusBadRequest, "bad_request", "dword is only supported for word devices")
+		if (dword || sint) && !isWordDevice(da.Device) {
+			if dword {
+				writeErr(w, http.StatusBadRequest, "bad_request", "dword is only supported for word devices")
+			} else {
+				writeErr(w, http.StatusBadRequest, "bad_request", "sint is only supported for word devices")
+			}
 			return
 		}
 
@@ -224,13 +245,50 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 				}
 				words := make([]uint16, len(dvals)*2)
 				for i, v := range dvals {
-					if v < 0 || v > 1<<32-1 {
-						writeErr(w, http.StatusBadRequest, "bad_request", "dword values must be in range 0..4294967295")
-						return
+					var u uint32
+					if sint {
+						if v < math.MinInt32 || v > math.MaxInt32 {
+							writeErr(w, http.StatusBadRequest, "bad_request", "sint dword values must be in range -2147483648..2147483647")
+							return
+						}
+						u = uint32(int32(v))
+					} else {
+						if v < 0 || v > 1<<32-1 {
+							writeErr(w, http.StatusBadRequest, "bad_request", "dword values must be in range 0..4294967295")
+							return
+						}
+						u = uint32(v)
 					}
-					u := uint32(v)
 					words[i*2] = uint16(u)
 					words[i*2+1] = uint16(u >> 16)
+				}
+				if err := plc.do(func(c *mc.Client3E) error {
+					return c.WriteWords(da.Device, da.Addr, words)
+				}); err != nil {
+					writePLCErr(w, err)
+					return
+				}
+			} else if sint {
+				var ivals []int
+				if err := json.Unmarshal(body.Values, &ivals); err != nil {
+					writeErr(w, http.StatusBadRequest, "bad_request", "values must be array of integers")
+					return
+				}
+				if len(ivals) == 0 {
+					writeErr(w, http.StatusBadRequest, "bad_request", "values must not be empty")
+					return
+				}
+				if len(ivals) > maxWriteValues {
+					writeErr(w, http.StatusBadRequest, "bad_request", "values must contain "+strconv.Itoa(maxWriteValues)+" items or less")
+					return
+				}
+				words := make([]uint16, len(ivals))
+				for i, v := range ivals {
+					if v < math.MinInt16 || v > math.MaxInt16 {
+						writeErr(w, http.StatusBadRequest, "bad_request", "sint word values must be in range -32768..32767")
+						return
+					}
+					words[i] = uint16(int16(v))
 				}
 				if err := plc.do(func(c *mc.Client3E) error {
 					return c.WriteWords(da.Device, da.Addr, words)
