@@ -117,7 +117,11 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 		sint := r.URL.Query().Get("sint") == "true"
 
 		if (dword || sint) && !isWordDevice(da.Device) {
-			writeErr(w, http.StatusBadRequest, "bad_request", "dword and sint are only supported for word devices")
+			if dword {
+				writeErr(w, http.StatusBadRequest, "bad_request", "dword is only supported for word devices")
+			} else {
+				writeErr(w, http.StatusBadRequest, "bad_request", "sint is only supported for word devices")
+			}
 			return
 		}
 
@@ -198,7 +202,11 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 		sint := r.URL.Query().Get("sint") == "true"
 
 		if (dword || sint) && !isWordDevice(da.Device) {
-			writeErr(w, http.StatusBadRequest, "bad_request", "dword and sint are only supported for word devices")
+			if dword {
+				writeErr(w, http.StatusBadRequest, "bad_request", "dword is only supported for word devices")
+			} else {
+				writeErr(w, http.StatusBadRequest, "bad_request", "sint is only supported for word devices")
+			}
 			return
 		}
 
