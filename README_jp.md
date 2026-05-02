@@ -80,8 +80,8 @@ go build -o gomc-rest .
 | Method | Path | パラメータ / body | レスポンス |
 | --- | --- | --- | --- |
 | `GET` 推奨、未強制 | `/health` | なし | `{"status":"ok","connected":true}` または `{"status":"disconnected","connected":false}` |
-| `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1` | `{"values":[100,200]}` または `{"values":[true,false]}` |
-| `POST` | `/write` | query: `addr` 必須、body: `{"values":[1,2,3]}` または `{"values":[true,false]}` | `{"ok":true}` |
+| `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1`、`dword` は任意でデフォルト `false` | `{"values":[100,200]}` または `{"values":[true,false]}` |
+| `POST` | `/write` | query: `addr` 必須、`dword` は任意でデフォルト `false`、body: `{"values":[1,2,3]}` または `{"values":[true,false]}` | `{"ok":true}` |
 | `POST` | `/remote/run` | query: `clear=0/1/2` 任意、`force=true/false` 任意 | `{"ok":true}` |
 | `POST` | `/remote/stop` | なし | `{"ok":true}` |
 | `POST` | `/remote/pause` | query: `force=true/false` 任意 | `{"ok":true}` |
@@ -94,6 +94,7 @@ go build -o gomc-rest .
 - `values` は必須で、要素数は `1` 以上 `1024` 以下です。
 - `/write` のリクエスト body は 1 MiB 以下である必要があります。
 - ワードデバイスには `0..65535` の整数配列、ビットデバイスには真偽値配列を指定します。
+- `dword=true` を指定すると、各値は符号なし 32 ビット整数（`0..4294967295`）として扱われます。下位 16 ビットは `addr` のレジスタに、上位 16 ビットは次のレジスタ（`addr+1`）に格納されます。`dword=true` はワードデバイスのみ対応しています。`dword=true` の場合、`count` は `512` 以下、`values` の要素数も `512` 以下にしてください（PLC へ送る語数が `1024` を超えないようにするため）。
 - `force` は query の値が厳密に `true` のときだけ有効です。
 - `/health` は PLC 未接続時でも常に HTTP `200` を返します。
 - `/remote/reset` は PLC 側で TCP 接続が閉じられるため、実行後に接続をクリアします。
@@ -136,10 +137,15 @@ go build -o gomc-rest .
 curl http://localhost:8080/health
 curl "http://localhost:8080/read?addr=D100&count=3"
 curl "http://localhost:8080/read?addr=M0&count=4"
+curl "http://localhost:8080/read?addr=D100&count=2&dword=true"
 
 curl -X POST "http://localhost:8080/write?addr=D100" \
   -H "Content-Type: application/json" \
   -d '{"values":[10,20,30]}'
+
+curl -X POST "http://localhost:8080/write?addr=D100&dword=true" \
+  -H "Content-Type: application/json" \
+  -d '{"values":[100000,200000]}'
 
 curl -X POST "http://localhost:8080/write?addr=M0" \
   -H "Content-Type: application/json" \
