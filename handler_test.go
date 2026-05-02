@@ -72,6 +72,17 @@ func TestHandleWriteRejectsTooLargeBody(t *testing.T) {
 	}
 }
 
+func TestHandleReadDwordRejectsTooLargeCount(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100&dword=true&count=513", nil)
+	rec := httptest.NewRecorder()
+
+	handleRead(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
 func TestHandleReadDwordRejectsBitDevice(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/read?addr=M0&dword=true", nil)
 	rec := httptest.NewRecorder()
@@ -96,7 +107,7 @@ func TestHandleWriteDwordRejectsBitDevice(t *testing.T) {
 }
 
 func TestHandleWriteDwordRejectsTooManyValues(t *testing.T) {
-	body := `{"values":[` + strings.TrimRight(strings.Repeat("100000,", maxWriteValues+1), ",") + `]}`
+	body := `{"values":[` + strings.TrimRight(strings.Repeat("100000,", maxWriteValues/2+1), ",") + `]}`
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 

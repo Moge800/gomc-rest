@@ -29,3 +29,8 @@ go.work.sum
 
 # Compiled binary (no extension on Linux/macOS)
 gomc-rest
+
+# Editor/IDE
+# .idea/
+# .vscode/
+.plan/

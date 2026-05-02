@@ -94,7 +94,7 @@ Notes:
 - `values` must be present and contain between `1` and `1024` items.
 - The `/write` request body must be 1 MiB or smaller.
 - Word devices require integer values in the range `0..65535`. Bit devices require boolean values.
-- When `dword=true`, each value is a 32-bit integer. The low 16 bits are stored in the register at `addr` and the high 16 bits in the next register (`addr+1`). Only word devices support `dword=true`.
+- When `dword=true`, each value is a 32-bit integer. The low 16 bits are stored in the register at `addr` and the high 16 bits in the next register (`addr+1`). Only word devices support `dword=true`. With `dword=true`, `count` must be `512` or less and `values` must contain `512` items or less (so that the actual word count sent to the PLC does not exceed `1024`).
 - `force` is enabled only when the query value is exactly `true`.
 - `/health` always returns HTTP `200`, even when the PLC is disconnected.
 - `/remote/reset` clears the TCP connection because the PLC closes it after reset.

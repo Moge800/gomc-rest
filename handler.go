@@ -102,6 +102,11 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 
 		dword := r.URL.Query().Get("dword") == "true"
 
+		if dword && count > maxReadCount/2 {
+			writeErr(w, http.StatusBadRequest, "bad_request", "dword count must be "+strconv.Itoa(maxReadCount/2)+" or less")
+			return
+		}
+
 		da, err := parseAddr(addrStr)
 		if err != nil {
 			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
@@ -213,8 +218,8 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 					writeErr(w, http.StatusBadRequest, "bad_request", "values must not be empty")
 					return
 				}
-				if len(dvals) > maxWriteValues {
-					writeErr(w, http.StatusBadRequest, "bad_request", "values must contain "+strconv.Itoa(maxWriteValues)+" items or less")
+				if len(dvals) > maxWriteValues/2 {
+					writeErr(w, http.StatusBadRequest, "bad_request", "values must contain "+strconv.Itoa(maxWriteValues/2)+" items or less")
 					return
 				}
 				words := make([]uint16, len(dvals)*2)
