@@ -71,3 +71,50 @@ func TestHandleWriteRejectsTooLargeBody(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
 	}
 }
+
+func TestHandleReadDwordRejectsBitDevice(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=M0&dword=true", nil)
+	rec := httptest.NewRecorder()
+
+	handleRead(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWriteDwordRejectsBitDevice(t *testing.T) {
+	body := `{"values":[100000]}`
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=M0&dword=true", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWriteDwordRejectsTooManyValues(t *testing.T) {
+	body := `{"values":[` + strings.TrimRight(strings.Repeat("100000,", maxWriteValues+1), ",") + `]}`
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWriteDwordRejectsOutOfRange(t *testing.T) {
+	body := `{"values":[-1]}`
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}

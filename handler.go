@@ -73,6 +73,7 @@ func handleHealth(plc *PLCClient) http.HandlerFunc {
 }
 
 // GET /read?addr=D100&count=5
+// GET /read?addr=D100&count=5&dword=true  (reads 32-bit double words; word devices only)
 func handleRead(plc *PLCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodGet) {
@@ -99,27 +100,48 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 			return
 		}
 
+		dword := r.URL.Query().Get("dword") == "true"
+
 		da, err := parseAddr(addrStr)
 		if err != nil {
 			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 			return
 		}
 
+		if dword && !isWordDevice(da.Device) {
+			writeErr(w, http.StatusBadRequest, "bad_request", "dword is only supported for word devices")
+			return
+		}
+
 		if isWordDevice(da.Device) {
+			readCount := count
+			if dword {
+				readCount = count * 2
+			}
 			var words []uint16
 			if err := plc.do(func(c *mc.Client3E) error {
 				var e error
-				words, e = c.ReadWords(da.Device, da.Addr, count)
+				words, e = c.ReadWords(da.Device, da.Addr, readCount)
 				return e
 			}); err != nil {
 				writePLCErr(w, err)
 				return
 			}
-			vals := make([]int, len(words))
-			for i, v := range words {
-				vals[i] = int(v)
+			if dword {
+				vals := make([]int64, count)
+				for i := range vals {
+					lo := uint32(words[i*2])
+					hi := uint32(words[i*2+1])
+					vals[i] = int64(lo | hi<<16)
+				}
+				writeJSON(w, http.StatusOK, map[string]any{"values": vals})
+			} else {
+				vals := make([]int, len(words))
+				for i, v := range words {
+					vals[i] = int(v)
+				}
+				writeJSON(w, http.StatusOK, map[string]any{"values": vals})
 			}
-			writeJSON(w, http.StatusOK, map[string]any{"values": vals})
 		} else {
 			var bits []bool
 			if err := plc.do(func(c *mc.Client3E) error {
@@ -136,6 +158,7 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 }
 
 // POST /write?addr=D100   body: {"values":[1,2,3]} or {"values":[true,false]}
+// POST /write?addr=D100&dword=true   body: {"values":[100000,200000]} (32-bit double words; word devices only)
 func handleWrite(plc *PLCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
@@ -151,6 +174,13 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 		da, err := parseAddr(addrStr)
 		if err != nil {
 			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+
+		dword := r.URL.Query().Get("dword") == "true"
+
+		if dword && !isWordDevice(da.Device) {
+			writeErr(w, http.StatusBadRequest, "bad_request", "dword is only supported for word devices")
 			return
 		}
 
@@ -173,24 +203,56 @@ func handleWrite(plc *PLCClient) http.HandlerFunc {
 		}
 
 		if isWordDevice(da.Device) {
-			var vals []uint16
-			if err := json.Unmarshal(body.Values, &vals); err != nil {
-				writeErr(w, http.StatusBadRequest, "bad_request", "values must be array of integers")
-				return
-			}
-			if len(vals) == 0 {
-				writeErr(w, http.StatusBadRequest, "bad_request", "values must not be empty")
-				return
-			}
-			if len(vals) > maxWriteValues {
-				writeErr(w, http.StatusBadRequest, "bad_request", "values must contain "+strconv.Itoa(maxWriteValues)+" items or less")
-				return
-			}
-			if err := plc.do(func(c *mc.Client3E) error {
-				return c.WriteWords(da.Device, da.Addr, vals)
-			}); err != nil {
-				writePLCErr(w, err)
-				return
+			if dword {
+				var dvals []int64
+				if err := json.Unmarshal(body.Values, &dvals); err != nil {
+					writeErr(w, http.StatusBadRequest, "bad_request", "values must be array of integers")
+					return
+				}
+				if len(dvals) == 0 {
+					writeErr(w, http.StatusBadRequest, "bad_request", "values must not be empty")
+					return
+				}
+				if len(dvals) > maxWriteValues {
+					writeErr(w, http.StatusBadRequest, "bad_request", "values must contain "+strconv.Itoa(maxWriteValues)+" items or less")
+					return
+				}
+				words := make([]uint16, len(dvals)*2)
+				for i, v := range dvals {
+					if v < 0 || v > 1<<32-1 {
+						writeErr(w, http.StatusBadRequest, "bad_request", "dword values must be in range 0..4294967295")
+						return
+					}
+					u := uint32(v)
+					words[i*2] = uint16(u)
+					words[i*2+1] = uint16(u >> 16)
+				}
+				if err := plc.do(func(c *mc.Client3E) error {
+					return c.WriteWords(da.Device, da.Addr, words)
+				}); err != nil {
+					writePLCErr(w, err)
+					return
+				}
+			} else {
+				var vals []uint16
+				if err := json.Unmarshal(body.Values, &vals); err != nil {
+					writeErr(w, http.StatusBadRequest, "bad_request", "values must be array of integers")
+					return
+				}
+				if len(vals) == 0 {
+					writeErr(w, http.StatusBadRequest, "bad_request", "values must not be empty")
+					return
+				}
+				if len(vals) > maxWriteValues {
+					writeErr(w, http.StatusBadRequest, "bad_request", "values must contain "+strconv.Itoa(maxWriteValues)+" items or less")
+					return
+				}
+				if err := plc.do(func(c *mc.Client3E) error {
+					return c.WriteWords(da.Device, da.Addr, vals)
+				}); err != nil {
+					writePLCErr(w, err)
+					return
+				}
 			}
 		} else {
 			var vals []bool

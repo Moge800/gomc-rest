@@ -80,8 +80,8 @@ All successful write and remote-control operations return:
 | Method | Path | Parameters / body | Response |
 | --- | --- | --- | --- |
 | `GET` recommended, not enforced | `/health` | none | `{"status":"ok","connected":true}` or `{"status":"disconnected","connected":false}` |
-| `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1` | `{"values":[100,200]}` or `{"values":[true,false]}` |
-| `POST` | `/write` | query: `addr` required; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
+| `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1`, `dword` optional and defaults to `false` | `{"values":[100,200]}` or `{"values":[true,false]}` |
+| `POST` | `/write` | query: `addr` required, `dword` optional and defaults to `false`; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
 | `POST` | `/remote/run` | query: `clear=0/1/2` optional, `force=true/false` optional | `{"ok":true}` |
 | `POST` | `/remote/stop` | none | `{"ok":true}` |
 | `POST` | `/remote/pause` | query: `force=true/false` optional | `{"ok":true}` |
@@ -94,6 +94,7 @@ Notes:
 - `values` must be present and contain between `1` and `1024` items.
 - The `/write` request body must be 1 MiB or smaller.
 - Word devices require integer values in the range `0..65535`. Bit devices require boolean values.
+- When `dword=true`, each value is a 32-bit integer. The low 16 bits are stored in the register at `addr` and the high 16 bits in the next register (`addr+1`). Only word devices support `dword=true`.
 - `force` is enabled only when the query value is exactly `true`.
 - `/health` always returns HTTP `200`, even when the PLC is disconnected.
 - `/remote/reset` clears the TCP connection because the PLC closes it after reset.
@@ -136,10 +137,15 @@ The `/health` endpoint can be used without a PLC. The other examples require a r
 curl http://localhost:8080/health
 curl "http://localhost:8080/read?addr=D100&count=3"
 curl "http://localhost:8080/read?addr=M0&count=4"
+curl "http://localhost:8080/read?addr=D100&count=2&dword=true"
 
 curl -X POST "http://localhost:8080/write?addr=D100" \
   -H "Content-Type: application/json" \
   -d '{"values":[10,20,30]}'
+
+curl -X POST "http://localhost:8080/write?addr=D100&dword=true" \
+  -H "Content-Type: application/json" \
+  -d '{"values":[100000,200000]}'
 
 curl -X POST "http://localhost:8080/write?addr=M0" \
   -H "Content-Type: application/json" \
