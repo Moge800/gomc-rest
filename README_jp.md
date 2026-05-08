@@ -49,7 +49,7 @@ Windows 用リリースバイナリの場合:
 ./gomc-rest -host 192.168.0.1 -port 5007 -mode binary -listen :8080
 ```
 
-読み取り専用で運用する場合は `-readonly` を追加します。読み取り専用モードでは `/health` と `/read` は利用でき、`/write` と `/remote/*` は `403 forbidden` になります。
+読み取り専用で運用する場合は `-readonly` を追加します。読み取り専用モードでは `/health` と `/read` は利用でき、`/write` と `/remote/*` の POST 操作は `403 forbidden` になります。
 
 ```powershell
 .\gomc-rest.exe -host 192.168.0.1 -port 5007 -mode binary -listen 127.0.0.1:8080 -readonly
@@ -75,7 +75,7 @@ go build -o gomc-rest .
 | `-port` | `PLC_PORT` | `5007` | PLC ポート、`1` から `65535` |
 | `-mode` | `PLC_MODE` | `binary` | `binary` または `ascii` |
 | `-listen` | `LISTEN_ADDR` | `:8080` | HTTP 待ち受けアドレス |
-| `-readonly` | `READONLY` | `false` | `true` のとき `/write` と `/remote/*` を拒否 |
+| `-readonly` | `READONLY` | `false` | `true` のとき `/write` と `/remote/*` の POST 操作を拒否 |
 
 ## API リファレンス
 
@@ -104,7 +104,7 @@ go build -o gomc-rest .
 - ワードデバイスには `0..65535` の整数配列、ビットデバイスには真偽値配列を指定します。
 - `dword=true` を指定すると、各値は符号なし 32 ビット整数（`0..4294967295`）として扱われます。下位 16 ビットは `addr` のレジスタに、上位 16 ビットは次のレジスタ（`addr+1`）に格納されます。`dword=true` はワードデバイスのみ対応しています。`dword=true` の場合、`count` は `512` 以下、`values` の要素数も `512` 以下にしてください（PLC へ送る語数が `1024` を超えないようにするため）。
 - `sint=true` を指定すると、値を符号付き整数として扱います。ワードデバイスは `-32768..32767`、`dword=true` との組み合わせでは `-2147483648..2147483647` の範囲になります。ビットデバイスには使用できません。PLC レジスタのビット列は変わらず、JSON との変換方式のみが変わります。
-- 読み取り専用モードでは `/write` と `/remote/*` は `403 forbidden` になります。読み取り専用モードは安全補助であり、ネットワーク分離、認証、認可、ファイアウォール、PLC 側保護の代替ではありません。
+- 読み取り専用モードでは `/write` と `/remote/*` の POST 操作は `403 forbidden` になります。読み取り専用モードは安全補助であり、ネットワーク分離、認証、認可、ファイアウォール、PLC 側保護の代替ではありません。
 - `force` は query の値が厳密に `true` のときだけ有効です。
 - `/health` は PLC 未接続時でも常に HTTP `200` を返します。
 - `/remote/reset` は PLC 側で TCP 接続が閉じられるため、実行後に接続をクリアします。

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,28 @@ import (
 
 	mc "github.com/moge800/gomcprotocol"
 )
+
+func assertReadOnlyError(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/json; charset=utf-8" {
+		t.Fatalf("Content-Type = %q, want %q", got, "application/json; charset=utf-8")
+	}
+
+	var body map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response body: %v", err)
+	}
+	if body["code"] != "forbidden" {
+		t.Fatalf("code = %q, want %q", body["code"], "forbidden")
+	}
+	if body["error"] != "operation not allowed in read-only mode" {
+		t.Fatalf("error = %q, want %q", body["error"], "operation not allowed in read-only mode")
+	}
+}
 
 func TestGetenvBool(t *testing.T) {
 	_ = os.Unsetenv("BOOL_TEST")
@@ -230,9 +253,7 @@ func TestHandleWriteReadOnlyRejects(t *testing.T) {
 
 	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), true)(rec, req)
 
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
-	}
+	assertReadOnlyError(t, rec)
 }
 
 func TestHandleRemoteReadOnlyRejects(t *testing.T) {
@@ -256,9 +277,7 @@ func TestHandleRemoteReadOnlyRejects(t *testing.T) {
 
 			endpoint.handler(rec, req)
 
-			if rec.Code != http.StatusForbidden {
-				t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
-			}
+			assertReadOnlyError(t, rec)
 		})
 	}
 }

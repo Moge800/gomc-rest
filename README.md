@@ -49,7 +49,7 @@ For source builds or non-Windows environments:
 ./gomc-rest -host 192.168.0.1 -port 5007 -mode binary -listen :8080
 ```
 
-For read-only operation, add `-readonly`. In read-only mode, `/health` and `/read` remain available, while `/write` and `/remote/*` return `403 forbidden`.
+For read-only operation, add `-readonly`. In read-only mode, `/health` and `/read` remain available, while POST operations on `/write` and `/remote/*` return `403 forbidden`.
 
 ```powershell
 .\gomc-rest.exe -host 192.168.0.1 -port 5007 -mode binary -listen 127.0.0.1:8080 -readonly
@@ -75,7 +75,7 @@ Flags take priority. Environment variables provide the default values for those 
 | `-port` | `PLC_PORT` | `5007` | PLC port, `1` to `65535` |
 | `-mode` | `PLC_MODE` | `binary` | `binary` or `ascii` |
 | `-listen` | `LISTEN_ADDR` | `:8080` | HTTP listen address |
-| `-readonly` | `READONLY` | `false` | Set to `true` to reject `/write` and `/remote/*` |
+| `-readonly` | `READONLY` | `false` | Set to `true` to reject POST operations on `/write` and `/remote/*` |
 
 ## API Reference
 
@@ -104,7 +104,7 @@ Notes:
 - Word devices require integer values in the range `0..65535`. Bit devices require boolean values.
 - When `dword=true`, each value is an unsigned 32-bit integer in the range `0..4294967295`. The low 16 bits are stored in the register at `addr` and the high 16 bits in the next register (`addr+1`). Only word devices support `dword=true`. With `dword=true`, `count` must be `512` or less and `values` must contain `512` items or less (so that the actual word count sent to the PLC does not exceed `1024`).
 - When `sint=true`, values are interpreted as signed integers. For word devices the range is `-32768..32767`; for `dword=true` the range is `-2147483648..2147483647`. Only word devices support `sint=true`. The PLC register bits are unchanged — `sint` only affects how values are converted between JSON and the 16-bit register representation.
-- When read-only mode is enabled, `/write` and `/remote/*` return `403 forbidden`. Read-only mode is a safety aid, not a replacement for network isolation, authentication, authorization, firewall rules, or PLC-side protection.
+- When read-only mode is enabled, POST operations on `/write` and `/remote/*` return `403 forbidden`. Read-only mode is a safety aid, not a replacement for network isolation, authentication, authorization, firewall rules, or PLC-side protection.
 - `force` is enabled only when the query value is exactly `true`.
 - `/health` always returns HTTP `200`, even when the PLC is disconnected.
 - `/remote/reset` clears the TCP connection because the PLC closes it after reset.
