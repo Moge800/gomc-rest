@@ -3,11 +3,44 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
 	mc "github.com/moge800/gomcprotocol"
 )
+
+func TestGetenvBool(t *testing.T) {
+	_ = os.Unsetenv("BOOL_TEST")
+	if got := getenvBool("BOOL_TEST", true); got != true {
+		t.Fatalf("unset env with fallback true = %v, want true", got)
+	}
+
+	t.Setenv("BOOL_TEST", "false")
+	if got := getenvBool("BOOL_TEST", true); got != false {
+		t.Fatalf("false env with fallback true = %v, want false", got)
+	}
+
+	t.Setenv("BOOL_TEST", "true")
+	if got := getenvBool("BOOL_TEST", false); got != true {
+		t.Fatalf("true env with fallback false = %v, want true", got)
+	}
+}
+
+func TestGetenvBoolRejectsInvalidValue(t *testing.T) {
+	if os.Getenv("TEST_GETENV_BOOL_INVALID") == "1" {
+		_ = getenvBool("BOOL_TEST", false)
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestGetenvBoolRejectsInvalidValue")
+	cmd.Env = append(os.Environ(), "TEST_GETENV_BOOL_INVALID=1", "BOOL_TEST=maybe")
+	err := cmd.Run()
+	if err == nil {
+		t.Fatal("expected invalid boolean env to exit non-zero")
+	}
+}
 
 func TestHandleReadRequiresGET(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/read?addr=D100", nil)

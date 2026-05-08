@@ -23,10 +23,15 @@ func getenv(key, fallback string) string {
 }
 
 func getenvBool(key string, fallback bool) bool {
-	if os.Getenv(key) == "true" {
-		return true
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
 	}
-	return fallback
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		log.Fatalf("invalid %s: %s", key, v)
+	}
+	return b
 }
 
 func main() {
