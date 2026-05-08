@@ -39,7 +39,7 @@ func TestHandleWriteRejectsTooManyWordValues(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -51,7 +51,7 @@ func TestHandleWriteRejectsTooManyBitValues(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=M0", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -65,7 +65,7 @@ func TestHandleWriteRejectsTooLargeBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), false)(rec, req)
 
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
@@ -99,7 +99,7 @@ func TestHandleWriteDwordRejectsBitDevice(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=M0&dword=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -111,7 +111,7 @@ func TestHandleWriteDwordRejectsTooManyValues(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -123,7 +123,7 @@ func TestHandleWriteDwordRejectsOutOfRange(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -135,7 +135,7 @@ func TestHandleWriteDwordRejectsAboveMaxUint32(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -158,7 +158,7 @@ func TestHandleWriteSintRejectsBitDevice(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=M0&sint=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -170,7 +170,7 @@ func TestHandleWriteSintWordRejectsOutOfRange(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&sint=true", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 
-		handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+		handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), false)(rec, req)
 
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("body=%s status = %d, want %d", body, rec.Code, http.StatusBadRequest)
@@ -183,10 +183,49 @@ func TestHandleWriteSintDwordRejectsOutOfRange(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true&sint=true", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 
-		handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary))(rec, req)
+		handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), false)(rec, req)
 
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("body=%s status = %d, want %d", body, rec.Code, http.StatusBadRequest)
 		}
+	}
+}
+
+func TestHandleWriteReadOnlyRejects(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100", strings.NewReader(`{"values":[1]}`))
+	rec := httptest.NewRecorder()
+
+	handleWrite(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), true)(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestHandleRemoteReadOnlyRejects(t *testing.T) {
+	readonly := true
+	endpoints := []struct {
+		name    string
+		path    string
+		handler http.HandlerFunc
+	}{
+		{"run", "/remote/run", handleRemoteRun(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), readonly)},
+		{"stop", "/remote/stop", handleRemoteStop(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), readonly)},
+		{"pause", "/remote/pause", handleRemotePause(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), readonly)},
+		{"latch-clear", "/remote/latch-clear", handleRemoteLatchClear(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), readonly)},
+		{"reset", "/remote/reset", handleRemoteReset(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), readonly)},
+	}
+
+	for _, endpoint := range endpoints {
+		t.Run(endpoint.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, endpoint.path, nil)
+			rec := httptest.NewRecorder()
+
+			endpoint.handler(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+			}
+		})
 	}
 }
