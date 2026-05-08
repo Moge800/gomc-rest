@@ -35,7 +35,7 @@ func assertReadOnlyError(t *testing.T, rec *httptest.ResponseRecorder) {
 }
 
 func TestGetenvBool(t *testing.T) {
-	_ = os.Unsetenv("BOOL_TEST")
+	t.Setenv("BOOL_TEST", "")
 	if got := getenvBool("BOOL_TEST", true); got != true {
 		t.Fatalf("unset env with fallback true = %v, want true", got)
 	}
