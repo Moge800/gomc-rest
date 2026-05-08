@@ -29,7 +29,7 @@ func getenvBool(key string, fallback bool) bool {
 	}
 	b, err := strconv.ParseBool(v)
 	if err != nil {
-		log.Fatalf("invalid %s: %s", key, v)
+		log.Fatalf("invalid %s %q: must be a boolean (true/false or 1/0)", key, v)
 	}
 	return b
 }

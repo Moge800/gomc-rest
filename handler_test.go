@@ -59,9 +59,19 @@ func TestGetenvBoolRejectsInvalidValue(t *testing.T) {
 
 	cmd := exec.Command(os.Args[0], "-test.run=TestGetenvBoolRejectsInvalidValue")
 	cmd.Env = append(os.Environ(), "TEST_GETENV_BOOL_INVALID=1", "BOOL_TEST=maybe")
-	err := cmd.Run()
+	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatal("expected invalid boolean env to exit non-zero")
+	}
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("err = %T, want *exec.ExitError", err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("exit code = %d, want 1", exitErr.ExitCode())
+	}
+	if !strings.Contains(string(output), `invalid BOOL_TEST "maybe": must be a boolean (true/false or 1/0)`) {
+		t.Fatalf("output = %q, want invalid BOOL_TEST message", output)
 	}
 }
 
