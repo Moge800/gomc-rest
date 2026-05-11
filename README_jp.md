@@ -137,6 +137,9 @@ go build -o gomc-rest .
 | PLC の MC プロトコルエラー、end code あり | `502` | `plc_error` | `{"status":502,"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
 | PLC 接続エラー | `503` | `connection_error` | `{"status":503,"error":"connect: refused","code":"connection_error"}` |
 | PLC 通信キューが満杯 | `503` | `busy` | `{"status":503,"error":"PLC communication queue is full","code":"busy"}` |
+| shutdown 中に PLC 通信キューが閉じられた | `503` | `queue_closed` | `{"status":503,"error":"PLC communication queue is closed","code":"queue_closed"}` |
+| HTTP request context が完了前にキャンセルされた | `499` | `request_canceled` | `{"status":499,"error":"request canceled","code":"request_canceled"}` |
+| HTTP request context の deadline が切れた | `504` | `request_timeout` | `{"status":504,"error":"request timed out","code":"request_timeout"}` |
 
 ## 接続の挙動
 

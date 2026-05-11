@@ -9,29 +9,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 )
-
-func getenv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-func getenvBool(key string, fallback bool) bool {
-	v := os.Getenv(key)
-	if v == "" {
-		return fallback
-	}
-	b, err := strconv.ParseBool(v)
-	if err != nil {
-		log.Fatalf("invalid %s %q: must be a boolean (true/false or 1/0)", key, v)
-	}
-	return b
-}
 
 func main() {
 	cfg, err := parseConfig(os.Args[1:], os.Getenv, os.Stderr)

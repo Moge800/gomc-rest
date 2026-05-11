@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	mc "github.com/moge800/gomcprotocol"
 )
@@ -67,6 +67,20 @@ func TestParseConfigRejects4EUDP(t *testing.T) {
 	}
 }
 
+func TestParseConfigRejectsInvalidReadOnlyEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "READONLY" {
+			return "maybe"
+		}
+		return ""
+	}
+
+	_, err := parseConfig(nil, lookupEnv, nil)
+	if err == nil || !strings.Contains(err.Error(), `invalid READONLY "maybe"`) {
+		t.Fatalf("err = %v, want invalid READONLY", err)
+	}
+}
+
 func assertReadOnlyError(t *testing.T, rec *httptest.ResponseRecorder) {
 	t.Helper()
 
@@ -89,47 +103,6 @@ func assertReadOnlyError(t *testing.T, rec *httptest.ResponseRecorder) {
 	}
 	if body["error"] != "operation not allowed in read-only mode" {
 		t.Fatalf("error = %q, want %q", body["error"], "operation not allowed in read-only mode")
-	}
-}
-
-func TestGetenvBool(t *testing.T) {
-	t.Setenv("BOOL_TEST", "")
-	if got := getenvBool("BOOL_TEST", true); got != true {
-		t.Fatalf("unset env with fallback true = %v, want true", got)
-	}
-
-	t.Setenv("BOOL_TEST", "false")
-	if got := getenvBool("BOOL_TEST", true); got != false {
-		t.Fatalf("false env with fallback true = %v, want false", got)
-	}
-
-	t.Setenv("BOOL_TEST", "true")
-	if got := getenvBool("BOOL_TEST", false); got != true {
-		t.Fatalf("true env with fallback false = %v, want true", got)
-	}
-}
-
-func TestGetenvBoolRejectsInvalidValue(t *testing.T) {
-	if os.Getenv("TEST_GETENV_BOOL_INVALID") == "1" {
-		_ = getenvBool("BOOL_TEST", false)
-		return
-	}
-
-	cmd := exec.Command(os.Args[0], "-test.run=TestGetenvBoolRejectsInvalidValue")
-	cmd.Env = append(os.Environ(), "TEST_GETENV_BOOL_INVALID=1", "BOOL_TEST=maybe")
-	output, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatal("expected invalid boolean env to exit non-zero")
-	}
-	exitErr, ok := err.(*exec.ExitError)
-	if !ok {
-		t.Fatalf("err = %T, want *exec.ExitError", err)
-	}
-	if exitErr.ExitCode() != 1 {
-		t.Fatalf("exit code = %d, want 1", exitErr.ExitCode())
-	}
-	if !strings.Contains(string(output), `invalid BOOL_TEST "maybe": must be a boolean (true/false or 1/0)`) {
-		t.Fatalf("output = %q, want invalid BOOL_TEST message", output)
 	}
 }
 
@@ -390,6 +363,41 @@ func TestWritePLCErrBusy(t *testing.T) {
 	}
 }
 
+func TestWritePLCErrQueueAndContextErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		err    error
+		status int
+		code   string
+	}{
+		{"queue closed", errQueueClosed, http.StatusServiceUnavailable, "queue_closed"},
+		{"canceled", context.Canceled, 499, "request_canceled"},
+		{"deadline", context.DeadlineExceeded, http.StatusGatewayTimeout, "request_timeout"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+
+			writePLCErr(rec, tt.err)
+
+			if rec.Code != tt.status {
+				t.Fatalf("status = %d, want %d", rec.Code, tt.status)
+			}
+			var body map[string]any
+			if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+				t.Fatalf("decode response body: %v", err)
+			}
+			if body["status"] != float64(tt.status) {
+				t.Fatalf("status body = %v, want %d", body["status"], tt.status)
+			}
+			if body["code"] != tt.code {
+				t.Fatalf("code = %q, want %q", body["code"], tt.code)
+			}
+		})
+	}
+}
+
 func TestHandleReadReturnsBusyWhenQueueIsFull(t *testing.T) {
 	plcQueue := newPLCQueue(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), 1)
 	started := make(chan struct{})
@@ -506,4 +514,53 @@ func TestWorkQueueReturnsBusyWhenFull(t *testing.T) {
 
 	close(release)
 	<-queuedRan
+}
+
+func TestWorkQueueRejectsEnqueueAfterShutdown(t *testing.T) {
+	queue := NewWorkQueue(1)
+	if err := queue.Shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown: %v", err)
+	}
+
+	_, err := queue.Do(context.Background(), func() (any, error) {
+		t.Fatal("job must not execute after shutdown")
+		return nil, nil
+	})
+	if !errors.Is(err, errQueueClosed) {
+		t.Fatalf("err = %v, want errQueueClosed", err)
+	}
+}
+
+func TestWorkQueueSkipsBufferedJobsAfterShutdown(t *testing.T) {
+	queue := &WorkQueue{
+		jobs:       make(chan workJob, 1),
+		done:       make(chan struct{}),
+		workerDone: make(chan struct{}),
+		closed:     true,
+	}
+	runJob := make(chan struct{})
+	queue.jobs <- workJob{
+		ctx: context.Background(),
+		execute: func() (any, error) {
+			close(runJob)
+			return nil, nil
+		},
+		result: make(chan workResult, 1),
+	}
+	close(queue.done)
+
+	go queue.run()
+
+	select {
+	case <-queue.workerDone:
+		select {
+		case <-runJob:
+			t.Fatal("buffered job must not run after shutdown")
+		default:
+		}
+	case <-runJob:
+		t.Fatal("buffered job must not run after shutdown")
+	case <-time.After(time.Second):
+		t.Fatal("worker did not stop after shutdown")
+	}
 }

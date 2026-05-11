@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -53,6 +54,12 @@ func writePLCErr(w http.ResponseWriter, err error) {
 	case errors.As(err, &busy):
 		w.Header().Set("Retry-After", "1")
 		writeErr(w, http.StatusServiceUnavailable, "busy", err.Error())
+	case errors.Is(err, errQueueClosed):
+		writeErr(w, http.StatusServiceUnavailable, "queue_closed", err.Error())
+	case errors.Is(err, context.Canceled):
+		writeErr(w, 499, "request_canceled", "request canceled")
+	case errors.Is(err, context.DeadlineExceeded):
+		writeErr(w, http.StatusGatewayTimeout, "request_timeout", "request timed out")
 	case errors.As(err, &connErr):
 		writeErr(w, http.StatusServiceUnavailable, "connection_error", err.Error())
 	case errors.As(err, &plcErr):

@@ -137,6 +137,9 @@ Errors are returned as JSON. Every error response includes both the HTTP status 
 | PLC MC protocol error with an end code | `502` | `plc_error` | `{"status":502,"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
 | PLC connection error | `503` | `connection_error` | `{"status":503,"error":"connect: refused","code":"connection_error"}` |
 | PLC communication queue is full | `503` | `busy` | `{"status":503,"error":"PLC communication queue is full","code":"busy"}` |
+| PLC communication queue is closed during shutdown | `503` | `queue_closed` | `{"status":503,"error":"PLC communication queue is closed","code":"queue_closed"}` |
+| HTTP request context was canceled before completion | `499` | `request_canceled` | `{"status":499,"error":"request canceled","code":"request_canceled"}` |
+| HTTP request context deadline expired | `504` | `request_timeout` | `{"status":504,"error":"request timed out","code":"request_timeout"}` |
 
 ## Connection Behavior
 

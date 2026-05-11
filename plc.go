@@ -158,7 +158,10 @@ func (p *PLCClient) doReset() error {
 	err := p.conn.RemoteReset()
 	p.conn = nil // PLC closes connection on reset regardless of error
 	var connErr *mc.MCProtocolConnectionError
-	if err != nil && !errors.As(err, &connErr) {
+	if errors.As(err, &connErr) {
+		return &connErrWrap{err}
+	}
+	if err != nil {
 		return err
 	}
 	return nil

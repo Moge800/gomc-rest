@@ -24,9 +24,11 @@ type workResult struct {
 }
 
 type WorkQueue struct {
+	mu         sync.RWMutex
 	jobs       chan workJob
 	done       chan struct{}
 	workerDone chan struct{}
+	closed     bool
 	stopOnce   sync.Once
 }
 
@@ -44,6 +46,11 @@ func (q *WorkQueue) Do(ctx context.Context, execute func() (any, error)) (any, e
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	q.mu.RLock()
+	if q.closed {
+		q.mu.RUnlock()
+		return nil, errQueueClosed
+	}
 
 	job := workJob{
 		ctx:     ctx,
@@ -53,11 +60,12 @@ func (q *WorkQueue) Do(ctx context.Context, execute func() (any, error)) (any, e
 
 	select {
 	case q.jobs <- job:
+		q.mu.RUnlock()
 	case <-ctx.Done():
+		q.mu.RUnlock()
 		return nil, ctx.Err()
-	case <-q.done:
-		return nil, errQueueClosed
 	default:
+		q.mu.RUnlock()
 		return nil, &busyErr{}
 	}
 
@@ -71,9 +79,18 @@ func (q *WorkQueue) Do(ctx context.Context, execute func() (any, error)) (any, e
 	}
 }
 
+func (q *WorkQueue) isClosed() bool {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	return q.closed
+}
+
 func (q *WorkQueue) Shutdown(ctx context.Context) error {
 	q.stopOnce.Do(func() {
+		q.mu.Lock()
+		q.closed = true
 		close(q.done)
+		q.mu.Unlock()
 	})
 
 	select {
@@ -91,6 +108,9 @@ func (q *WorkQueue) run() {
 		case <-q.done:
 			return
 		case job := <-q.jobs:
+			if q.isClosed() {
+				return
+			}
 			q.runJob(job)
 		}
 	}

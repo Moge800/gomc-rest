@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 	"time"
 
@@ -50,7 +49,11 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 	portStr := fs.String("port", getenvWith(lookupEnv, "PLC_PORT", "5007"), "PLC port")
 	modeStr := fs.String("mode", getenvWith(lookupEnv, "PLC_MODE", "binary"), "PLC mode (binary|ascii)")
 	listen := fs.String("listen", getenvWith(lookupEnv, "LISTEN_ADDR", ":8080"), "HTTP listen address")
-	readonly := fs.Bool("readonly", getenvBoolWith(lookupEnv, "READONLY", false), "disable write and remote-control endpoints")
+	readonlyDefault, err := getenvBoolWith(lookupEnv, "READONLY", false)
+	if err != nil {
+		return ServerConfig{}, err
+	}
+	readonly := fs.Bool("readonly", readonlyDefault, "disable write and remote-control endpoints")
 	frameStr := fs.String("frame", getenvWith(lookupEnv, "PLC_FRAME", string(frame3E)), "MC Protocol frame (3e|4e)")
 	transportStr := fs.String("transport", getenvWith(lookupEnv, "PLC_TRANSPORT", string(transportTCP)), "PLC transport (tcp|udp)")
 	queueSizeStr := fs.String("queue-size", getenvWith(lookupEnv, "QUEUE_SIZE", "32"), "PLC communication queue size")
@@ -123,14 +126,14 @@ func getenvWith(lookupEnv func(string) string, key, fallback string) string {
 	return fallback
 }
 
-func getenvBoolWith(lookupEnv func(string) string, key string, fallback bool) bool {
+func getenvBoolWith(lookupEnv func(string) string, key string, fallback bool) (bool, error) {
 	v := lookupEnv(key)
 	if v == "" {
-		return fallback
+		return fallback, nil
 	}
 	b, err := strconv.ParseBool(v)
 	if err != nil {
-		log.Fatalf("invalid %s %q: must be a boolean (true/false or 1/0)", key, v)
+		return fallback, fmt.Errorf("invalid %s %q: must be a boolean (true/false or 1/0)", key, v)
 	}
-	return b
+	return b, nil
 }
