@@ -2,7 +2,7 @@
 
 [English README](README.md)
 
-`gomc-rest` は、三菱電機 PLC（MC プロトコル 3E フレーム）向けの小さな REST API サーバーです。HTTP クライアントから `D100` や `M0` のようなデバイス文字列を指定して読み書きでき、ワードデバイスは整数、ビットデバイスは真偽値として JSON に自動変換します。
+`gomc-rest` は、三菱電機 PLC（MC プロトコル 3E / 4E フレーム）向けの小さな REST API サーバーです。HTTP クライアントから `D100` や `M0` のようなデバイス文字列を指定して読み書きでき、ワードデバイスは整数、ビットデバイスは真偽値として JSON に自動変換します。
 
 PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使用します。HTTP サーバー部分は Go の標準ライブラリのみで実装されています。
 
@@ -13,6 +13,7 @@ PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使�
 - RemoteRun、RemoteStop、RemotePause、RemoteLatchClear、RemoteReset に対応。
 - コマンドラインフラグで設定し、環境変数をデフォルト値として利用。
 - 読み取り専用モードで起動し、書き込みとリモート操作を拒否可能。
+- プロセス内の単一 worker queue で PLC 通信を直列化。
 - `/health` で現在の接続状態を確認。
 - 起動時接続に失敗しても HTTP サーバーは起動し、PLC 要求時に再接続を試行。
 
@@ -46,7 +47,7 @@ Windows 用リリースバイナリの場合:
 ソースからビルドした場合、または Windows 以外の環境の場合:
 
 ```bash
-./gomc-rest -host 192.168.0.1 -port 5007 -mode binary -listen :8080
+./gomc-rest -host 192.168.0.1 -port 5007 -frame 3e -transport tcp -mode binary -queue-size 32 -timeout 5s -listen :8080
 ```
 
 読み取り専用で運用する場合は `-readonly` を追加します。読み取り専用モードでは `/health` と `/read` は利用でき、`/write` と `/remote/*` の POST 操作は `403 forbidden` になります。
@@ -73,7 +74,11 @@ go build -o gomc-rest .
 | --- | --- | --- | --- |
 | `-host` | `PLC_HOST` | `192.168.0.1` | PLC のホスト名または IP アドレス |
 | `-port` | `PLC_PORT` | `5007` | PLC ポート、`1` から `65535` |
+| `-frame` | `PLC_FRAME` | `3e` | MC プロトコルフレーム、`3e` または `4e` |
+| `-transport` | `PLC_TRANSPORT` | `tcp` | `tcp` または `udp`。`4e` は `tcp` のみ対応 |
 | `-mode` | `PLC_MODE` | `binary` | `binary` または `ascii` |
+| `-queue-size` | `QUEUE_SIZE` | `32` | 1 件の実行中要求とは別に待機できる PLC 要求数 |
+| `-timeout` | `PLC_TIMEOUT` | `5s` | PLC 接続および I/O timeout |
 | `-listen` | `LISTEN_ADDR` | `:8080` | HTTP 待ち受けアドレス |
 | `-readonly` | `READONLY` | `false` | `true` のとき `/write` と `/remote/*` の POST 操作を拒否 |
 
@@ -122,20 +127,23 @@ go build -o gomc-rest .
 
 ## エラーレスポンス
 
-エラーは JSON で返します。
+エラーは JSON で返します。すべてのエラー応答は HTTP status code と機械判定用の `code` を body に含めます。
 
 | 状態 | HTTP | `code` | 例 |
 | --- | --- | --- | --- |
-| パラメータ、body、アドレス、count が不正、または POST 専用エンドポイントで method が不正 | `400` または `405` | `bad_request` | `{"error":"addr is required","code":"bad_request"}` |
-| 読み取り専用モードで拒否された操作 | `403` | `forbidden` | `{"error":"operation not allowed in read-only mode","code":"forbidden"}` |
-| `/write` の body サイズ超過 | `413` | `bad_request` | `{"error":"body must not be larger than 1048576 bytes","code":"bad_request"}` |
-| PLC の MC プロトコルエラー、end code あり | `502` | `plc_error` | `{"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
-| PLC 接続エラー | `503` | `connection_error` | `{"error":"connect: refused","code":"connection_error"}` |
+| パラメータ、body、アドレス、count が不正、または POST 専用エンドポイントで method が不正 | `400` または `405` | `bad_request` | `{"status":400,"error":"addr is required","code":"bad_request"}` |
+| 読み取り専用モードで拒否された操作 | `403` | `forbidden` | `{"status":403,"error":"operation not allowed in read-only mode","code":"forbidden"}` |
+| `/write` の body サイズ超過 | `413` | `bad_request` | `{"status":413,"error":"body must not be larger than 1048576 bytes","code":"bad_request"}` |
+| PLC の MC プロトコルエラー、end code あり | `502` | `plc_error` | `{"status":502,"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
+| PLC 接続エラー | `503` | `connection_error` | `{"status":503,"error":"connect: refused","code":"connection_error"}` |
+| PLC 通信キューが満杯 | `503` | `busy` | `{"status":503,"error":"PLC communication queue is full","code":"busy"}` |
 
 ## 接続の挙動
 
-- PLC 要求は 1 つの共有クライアント接続で直列化されます。
-- MC プロトコルクライアントのタイムアウトは 5 秒です。
+- PLC 要求は、プロセス内の単一 worker queue と 1 つの共有クライアント接続で直列化されます。
+- worker は PLC 要求を常に 1 件ずつ実行します。HTTP handler は PLC client を直接呼びません。
+- `-queue-size` は、1 件の実行中要求とは別に待機できる PLC 要求数です。キューが満杯の場合、server は待たせず `Retry-After: 1` 付きの `503 busy` を返します。
+- `-timeout` は PLC 接続と I/O deadline です。HTTP request context の timeout とは別物です。キュー待機中に request context がキャンセルされた要求は、通信開始前に実行されません。
 - 起動時接続に失敗しても HTTP サーバーは起動します。
 - 有効な接続がない場合、次の PLC 要求で再接続を試行します。
 - 接続レベルの MC プロトコルエラーが発生した場合、接続をクリアして次回要求で再接続できるようにします。

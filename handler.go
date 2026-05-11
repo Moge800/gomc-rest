@@ -24,7 +24,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeErr(w http.ResponseWriter, status int, code, msg string) {
-	body := map[string]string{"error": msg, "code": code}
+	body := map[string]any{"status": status, "error": msg, "code": code}
 	writeJSON(w, status, body)
 }
 
@@ -46,13 +46,18 @@ func requireWritable(w http.ResponseWriter, readonly bool) bool {
 }
 
 func writePLCErr(w http.ResponseWriter, err error) {
+	var busy *busyErr
 	var connErr *connErrWrap
 	var plcErr *mc.MCProtocolError
 	switch {
+	case errors.As(err, &busy):
+		w.Header().Set("Retry-After", "1")
+		writeErr(w, http.StatusServiceUnavailable, "busy", err.Error())
 	case errors.As(err, &connErr):
 		writeErr(w, http.StatusServiceUnavailable, "connection_error", err.Error())
 	case errors.As(err, &plcErr):
-		body := map[string]string{
+		body := map[string]any{
+			"status":   http.StatusBadGateway,
 			"error":    err.Error(),
 			"code":     "plc_error",
 			"end_code": "0x" + strconv.FormatUint(uint64(plcErr.EndCode), 16),
@@ -64,11 +69,9 @@ func writePLCErr(w http.ResponseWriter, err error) {
 }
 
 // GET /health
-func handleHealth(plc *PLCClient) http.HandlerFunc {
+func handleHealth(plc *PLCQueue) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
-		plc.mu.Lock()
-		connected := plc.isConnected()
-		plc.mu.Unlock()
+		connected := plc.IsConnected()
 
 		status := "ok"
 		if !connected {
@@ -83,7 +86,7 @@ func handleHealth(plc *PLCClient) http.HandlerFunc {
 
 // GET /read?addr=D100&count=5
 // GET /read?addr=D100&count=5&dword=true  (reads 32-bit double words; word devices only)
-func handleRead(plc *PLCClient) http.HandlerFunc {
+func handleRead(plc *PLCQueue) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodGet) {
 			return
@@ -138,12 +141,8 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 			if dword {
 				readCount = count * 2
 			}
-			var words []uint16
-			if err := plc.do(func(c *mc.Client3E) error {
-				var e error
-				words, e = c.ReadWords(da.Device, da.Addr, readCount)
-				return e
-			}); err != nil {
+			words, err := plc.ReadWords(r.Context(), da.Device, da.Addr, readCount)
+			if err != nil {
 				writePLCErr(w, err)
 				return
 			}
@@ -172,12 +171,8 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 				writeJSON(w, http.StatusOK, map[string]any{"values": vals})
 			}
 		} else {
-			var bits []bool
-			if err := plc.do(func(c *mc.Client3E) error {
-				var e error
-				bits, e = c.ReadBits(da.Device, da.Addr, count)
-				return e
-			}); err != nil {
+			bits, err := plc.ReadBits(r.Context(), da.Device, da.Addr, count)
+			if err != nil {
 				writePLCErr(w, err)
 				return
 			}
@@ -188,7 +183,7 @@ func handleRead(plc *PLCClient) http.HandlerFunc {
 
 // POST /write?addr=D100   body: {"values":[1,2,3]} or {"values":[true,false]}
 // POST /write?addr=D100&dword=true   body: {"values":[100000,200000]} (32-bit double words; word devices only)
-func handleWrite(plc *PLCClient, readonly bool) http.HandlerFunc {
+func handleWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
 			return
@@ -273,9 +268,7 @@ func handleWrite(plc *PLCClient, readonly bool) http.HandlerFunc {
 					words[i*2] = uint16(u)
 					words[i*2+1] = uint16(u >> 16)
 				}
-				if err := plc.do(func(c *mc.Client3E) error {
-					return c.WriteWords(da.Device, da.Addr, words)
-				}); err != nil {
+				if err := plc.WriteWords(r.Context(), da.Device, da.Addr, words); err != nil {
 					writePLCErr(w, err)
 					return
 				}
@@ -301,9 +294,7 @@ func handleWrite(plc *PLCClient, readonly bool) http.HandlerFunc {
 					}
 					words[i] = uint16(int16(v))
 				}
-				if err := plc.do(func(c *mc.Client3E) error {
-					return c.WriteWords(da.Device, da.Addr, words)
-				}); err != nil {
+				if err := plc.WriteWords(r.Context(), da.Device, da.Addr, words); err != nil {
 					writePLCErr(w, err)
 					return
 				}
@@ -321,9 +312,7 @@ func handleWrite(plc *PLCClient, readonly bool) http.HandlerFunc {
 					writeErr(w, http.StatusBadRequest, "bad_request", "values must contain "+strconv.Itoa(maxWriteValues)+" items or less")
 					return
 				}
-				if err := plc.do(func(c *mc.Client3E) error {
-					return c.WriteWords(da.Device, da.Addr, vals)
-				}); err != nil {
+				if err := plc.WriteWords(r.Context(), da.Device, da.Addr, vals); err != nil {
 					writePLCErr(w, err)
 					return
 				}
@@ -342,9 +331,7 @@ func handleWrite(plc *PLCClient, readonly bool) http.HandlerFunc {
 				writeErr(w, http.StatusBadRequest, "bad_request", "values must contain "+strconv.Itoa(maxWriteValues)+" items or less")
 				return
 			}
-			if err := plc.do(func(c *mc.Client3E) error {
-				return c.WriteBits(da.Device, da.Addr, vals)
-			}); err != nil {
+			if err := plc.WriteBits(r.Context(), da.Device, da.Addr, vals); err != nil {
 				writePLCErr(w, err)
 				return
 			}
@@ -355,7 +342,7 @@ func handleWrite(plc *PLCClient, readonly bool) http.HandlerFunc {
 }
 
 // POST /remote/run?clear=0&force=false
-func handleRemoteRun(plc *PLCClient, readonly bool) http.HandlerFunc {
+func handleRemoteRun(plc *PLCQueue, readonly bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
 			return
@@ -374,9 +361,7 @@ func handleRemoteRun(plc *PLCClient, readonly bool) http.HandlerFunc {
 		}
 		force := r.URL.Query().Get("force") == "true"
 
-		if err := plc.do(func(c *mc.Client3E) error {
-			return c.RemoteRun(clear, force)
-		}); err != nil {
+		if err := plc.RemoteRun(r.Context(), clear, force); err != nil {
 			writePLCErr(w, err)
 			return
 		}
@@ -385,7 +370,7 @@ func handleRemoteRun(plc *PLCClient, readonly bool) http.HandlerFunc {
 }
 
 // POST /remote/stop
-func handleRemoteStop(plc *PLCClient, readonly bool) http.HandlerFunc {
+func handleRemoteStop(plc *PLCQueue, readonly bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
 			return
@@ -393,9 +378,7 @@ func handleRemoteStop(plc *PLCClient, readonly bool) http.HandlerFunc {
 		if !requireWritable(w, readonly) {
 			return
 		}
-		if err := plc.do(func(c *mc.Client3E) error {
-			return c.RemoteStop()
-		}); err != nil {
+		if err := plc.RemoteStop(r.Context()); err != nil {
 			writePLCErr(w, err)
 			return
 		}
@@ -404,7 +387,7 @@ func handleRemoteStop(plc *PLCClient, readonly bool) http.HandlerFunc {
 }
 
 // POST /remote/pause?force=false
-func handleRemotePause(plc *PLCClient, readonly bool) http.HandlerFunc {
+func handleRemotePause(plc *PLCQueue, readonly bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
 			return
@@ -413,9 +396,7 @@ func handleRemotePause(plc *PLCClient, readonly bool) http.HandlerFunc {
 			return
 		}
 		force := r.URL.Query().Get("force") == "true"
-		if err := plc.do(func(c *mc.Client3E) error {
-			return c.RemotePause(force)
-		}); err != nil {
+		if err := plc.RemotePause(r.Context(), force); err != nil {
 			writePLCErr(w, err)
 			return
 		}
@@ -424,7 +405,7 @@ func handleRemotePause(plc *PLCClient, readonly bool) http.HandlerFunc {
 }
 
 // POST /remote/latch-clear
-func handleRemoteLatchClear(plc *PLCClient, readonly bool) http.HandlerFunc {
+func handleRemoteLatchClear(plc *PLCQueue, readonly bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
 			return
@@ -432,9 +413,7 @@ func handleRemoteLatchClear(plc *PLCClient, readonly bool) http.HandlerFunc {
 		if !requireWritable(w, readonly) {
 			return
 		}
-		if err := plc.do(func(c *mc.Client3E) error {
-			return c.RemoteLatchClear()
-		}); err != nil {
+		if err := plc.RemoteLatchClear(r.Context()); err != nil {
 			writePLCErr(w, err)
 			return
 		}
@@ -443,7 +422,7 @@ func handleRemoteLatchClear(plc *PLCClient, readonly bool) http.HandlerFunc {
 }
 
 // POST /remote/reset
-func handleRemoteReset(plc *PLCClient, readonly bool) http.HandlerFunc {
+func handleRemoteReset(plc *PLCQueue, readonly bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
 			return
@@ -451,7 +430,7 @@ func handleRemoteReset(plc *PLCClient, readonly bool) http.HandlerFunc {
 		if !requireWritable(w, readonly) {
 			return
 		}
-		if err := plc.doReset(); err != nil {
+		if err := plc.RemoteReset(r.Context()); err != nil {
 			writePLCErr(w, err)
 			return
 		}

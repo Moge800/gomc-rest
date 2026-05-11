@@ -9,30 +9,84 @@ import (
 	mc "github.com/moge800/gomcprotocol"
 )
 
+type plcConnection interface {
+	ReadWords(device string, start, count int) ([]uint16, error)
+	WriteWords(device string, start int, values []uint16) error
+	ReadBits(device string, start, count int) ([]bool, error)
+	WriteBits(device string, start int, values []bool) error
+	RemoteRun(clearMode int, force bool) error
+	RemoteStop() error
+	RemotePause(force bool) error
+	RemoteLatchClear() error
+	RemoteReset() error
+	Close() error
+}
+
+type plcDialer interface {
+	plcConnection
+	Connect() error
+	SetTimeout(time.Duration)
+}
+
 type PLCClient struct {
 	mu   sync.Mutex
-	conn *mc.Client3E // nil = disconnected
+	conn plcConnection // nil = disconnected
 
-	host string
-	port int
-	mode mc.Mode
+	host      string
+	port      int
+	mode      mc.Mode
+	frame     PLCFrame
+	transport PLCTransport
+	timeout   time.Duration
 }
 
 func newPLCClient(host string, port int, mode mc.Mode) *PLCClient {
-	return &PLCClient{host: host, port: port, mode: mode}
+	return newConfiguredPLCClient(ServerConfig{
+		Host:      host,
+		Port:      port,
+		Mode:      mode,
+		Frame:     frame3E,
+		Transport: transportTCP,
+		Timeout:   5 * time.Second,
+	})
+}
+
+func newConfiguredPLCClient(cfg ServerConfig) *PLCClient {
+	return &PLCClient{
+		host:      cfg.Host,
+		port:      cfg.Port,
+		mode:      cfg.Mode,
+		frame:     cfg.Frame,
+		transport: cfg.Transport,
+		timeout:   cfg.Timeout,
+	}
 }
 
 func (p *PLCClient) reconnect() error {
-	c, err := mc.New3EClient(p.host, p.port, p.mode)
+	c, err := p.newConnection()
 	if err != nil {
 		return err
 	}
-	c.SetTimeout(5 * time.Second)
+	c.SetTimeout(p.timeout)
 	if err := c.Connect(); err != nil {
 		return err
 	}
 	p.conn = c
 	return nil
+}
+
+func (p *PLCClient) newConnection() (plcDialer, error) {
+	switch p.frame {
+	case frame3E:
+		if p.transport == transportUDP {
+			return mc.New3EClientUDP(p.host, p.port, p.mode)
+		}
+		return mc.New3EClient(p.host, p.port, p.mode)
+	case frame4E:
+		return mc.New4EClient(p.host, p.port, p.mode)
+	default:
+		return nil, fmt.Errorf("unsupported frame %q", p.frame)
+	}
 }
 
 // initialConnect attempts connection at startup; logs failure but does not exit.
@@ -49,9 +103,15 @@ func (p *PLCClient) isConnected() bool {
 	return p.conn != nil
 }
 
+func (p *PLCClient) isConnectedSafe() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.isConnected()
+}
+
 // do runs fn under the mutex. On MCProtocolConnectionError the connection is
 // cleared so the next call triggers a reconnect.
-func (p *PLCClient) do(fn func(*mc.Client3E) error) error {
+func (p *PLCClient) do(fn func(plcConnection) error) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -72,6 +132,15 @@ func (p *PLCClient) do(fn func(*mc.Client3E) error) error {
 		return &connErrWrap{err}
 	}
 	return err
+}
+
+func (p *PLCClient) close() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.conn != nil {
+		_ = p.conn.Close()
+		p.conn = nil
+	}
 }
 
 // doReset is like do but always clears the connection afterwards (RemoteReset

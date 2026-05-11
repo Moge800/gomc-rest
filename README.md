@@ -2,7 +2,7 @@
 
 [日本語 README](README_jp.md)
 
-`gomc-rest` is a small REST API server for Mitsubishi Electric PLCs using the MC protocol 3E frame. It lets HTTP clients read and write PLC devices such as `D100` or `M0`, returning JSON values with automatic conversion: word devices become integers and bit devices become booleans.
+`gomc-rest` is a small REST API server for Mitsubishi Electric PLCs using MC protocol 3E or 4E frames. It lets HTTP clients read and write PLC devices such as `D100` or `M0`, returning JSON values with automatic conversion: word devices become integers and bit devices become booleans.
 
 The PLC transport is provided by [gomcprotocol](https://github.com/moge800/gomcprotocol). The server uses only the Go standard library for HTTP handling.
 
@@ -13,6 +13,7 @@ The PLC transport is provided by [gomcprotocol](https://github.com/moge800/gomcp
 - Run, stop, pause, latch-clear, and reset the PLC remotely.
 - Configure by command-line flags, with environment variables as defaults.
 - Start in read-only mode to block write and remote-control endpoints.
+- Serialize PLC communication through a single in-process worker queue.
 - Keep a simple health endpoint that reports the current connection state.
 - Retry the PLC connection on demand when startup connection fails or a previous connection was cleared.
 
@@ -46,7 +47,7 @@ For the Windows release binary:
 For source builds or non-Windows environments:
 
 ```bash
-./gomc-rest -host 192.168.0.1 -port 5007 -mode binary -listen :8080
+./gomc-rest -host 192.168.0.1 -port 5007 -frame 3e -transport tcp -mode binary -queue-size 32 -timeout 5s -listen :8080
 ```
 
 For read-only operation, add `-readonly`. In read-only mode, `/health` and `/read` remain available, while POST operations on `/write` and `/remote/*` return `403 forbidden`.
@@ -73,7 +74,11 @@ Flags take priority. Environment variables provide the default values for those 
 | --- | --- | --- | --- |
 | `-host` | `PLC_HOST` | `192.168.0.1` | PLC host or IP address |
 | `-port` | `PLC_PORT` | `5007` | PLC port, `1` to `65535` |
+| `-frame` | `PLC_FRAME` | `3e` | MC protocol frame, `3e` or `4e` |
+| `-transport` | `PLC_TRANSPORT` | `tcp` | `tcp` or `udp`; `4e` supports `tcp` only |
 | `-mode` | `PLC_MODE` | `binary` | `binary` or `ascii` |
+| `-queue-size` | `QUEUE_SIZE` | `32` | Number of PLC requests that can wait while one request is active |
+| `-timeout` | `PLC_TIMEOUT` | `5s` | PLC connect and I/O timeout |
 | `-listen` | `LISTEN_ADDR` | `:8080` | HTTP listen address |
 | `-readonly` | `READONLY` | `false` | Set to `true` to reject POST operations on `/write` and `/remote/*` |
 
@@ -122,20 +127,23 @@ The numeric address must be a non-negative integer. Unknown devices, missing num
 
 ## Error Responses
 
-Errors are returned as JSON.
+Errors are returned as JSON. Every error response includes both the HTTP status code and a machine-readable `code` in the body.
 
 | Scenario | HTTP | `code` | Example |
 | --- | --- | --- | --- |
-| Invalid parameter, body, address, count, or method | `400` or `405` | `bad_request` | `{"error":"addr is required","code":"bad_request"}` |
-| Operation rejected by read-only mode | `403` | `forbidden` | `{"error":"operation not allowed in read-only mode","code":"forbidden"}` |
-| `/write` body is too large | `413` | `bad_request` | `{"error":"body must not be larger than 1048576 bytes","code":"bad_request"}` |
-| PLC MC protocol error with an end code | `502` | `plc_error` | `{"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
-| PLC connection error | `503` | `connection_error` | `{"error":"connect: refused","code":"connection_error"}` |
+| Invalid parameter, body, address, count, or method | `400` or `405` | `bad_request` | `{"status":400,"error":"addr is required","code":"bad_request"}` |
+| Operation rejected by read-only mode | `403` | `forbidden` | `{"status":403,"error":"operation not allowed in read-only mode","code":"forbidden"}` |
+| `/write` body is too large | `413` | `bad_request` | `{"status":413,"error":"body must not be larger than 1048576 bytes","code":"bad_request"}` |
+| PLC MC protocol error with an end code | `502` | `plc_error` | `{"status":502,"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
+| PLC connection error | `503` | `connection_error` | `{"status":503,"error":"connect: refused","code":"connection_error"}` |
+| PLC communication queue is full | `503` | `busy` | `{"status":503,"error":"PLC communication queue is full","code":"busy"}` |
 
 ## Connection Behavior
 
-- PLC requests are serialized through one shared client connection.
-- The MC protocol client timeout is set to 5 seconds.
+- PLC requests are serialized through one shared in-process worker queue and one client connection.
+- The worker executes one PLC request at a time. HTTP handlers do not call the PLC client directly.
+- `-queue-size` controls how many PLC requests can wait while one request is active. When the queue is full, the server immediately returns `503 busy` with `Retry-After: 1`.
+- `-timeout` controls the PLC connect and I/O deadline. It does not cancel HTTP request contexts that are already disconnected; queued requests are skipped before execution if their request context is canceled.
 - If initial connection fails, the HTTP server still starts.
 - If there is no active connection, the next PLC request attempts to reconnect.
 - Connection-level MC protocol errors clear the connection so a later request can reconnect.
