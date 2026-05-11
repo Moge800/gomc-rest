@@ -34,3 +34,5 @@ gomc-rest
 # .idea/
 # .vscode/
 .plan/
+.claude/
+copilot-instructions.md
