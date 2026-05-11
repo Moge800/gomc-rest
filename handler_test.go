@@ -13,8 +13,15 @@ import (
 	mc "github.com/moge800/gomcprotocol"
 )
 
-func newTestPLCQueue() *PLCQueue {
-	return newPLCQueue(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), 32)
+func newTestPLCQueue(t *testing.T) *PLCQueue {
+	t.Helper()
+
+	plcQueue := newPLCQueue(newPLCClient("127.0.0.1", 5007, mc.ModeBinary), 32)
+	t.Cleanup(func() {
+		_ = plcQueue.Shutdown(context.Background())
+		plcQueue.Close()
+	})
+	return plcQueue
 }
 
 func emptyEnv(string) string { return "" }
@@ -81,6 +88,23 @@ func TestParseConfigRejectsInvalidReadOnlyEnv(t *testing.T) {
 	}
 }
 
+func TestParseConfigReadOnlyFlagOverridesInvalidEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "READONLY" {
+			return "maybe"
+		}
+		return ""
+	}
+
+	cfg, err := parseConfig([]string{"-readonly"}, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if !cfg.ReadOnly {
+		t.Fatal("ReadOnly = false, want true")
+	}
+}
+
 func assertReadOnlyError(t *testing.T, rec *httptest.ResponseRecorder) {
 	t.Helper()
 
@@ -110,7 +134,7 @@ func TestHandleReadRequiresGET(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/read?addr=D100", nil)
 	rec := httptest.NewRecorder()
 
-	handleRead(newTestPLCQueue())(rec, req)
+	handleRead(newTestPLCQueue(t))(rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
@@ -124,7 +148,7 @@ func TestHandleReadRejectsTooLargeCount(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100&count=1025", nil)
 	rec := httptest.NewRecorder()
 
-	handleRead(newTestPLCQueue())(rec, req)
+	handleRead(newTestPLCQueue(t))(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -136,7 +160,7 @@ func TestHandleWriteRejectsTooManyWordValues(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newTestPLCQueue(), false)(rec, req)
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -148,7 +172,7 @@ func TestHandleWriteRejectsTooManyBitValues(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=M0", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newTestPLCQueue(), false)(rec, req)
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -162,7 +186,7 @@ func TestHandleWriteRejectsTooLargeBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newTestPLCQueue(), false)(rec, req)
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
 
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
@@ -173,7 +197,7 @@ func TestHandleReadDwordRejectsTooLargeCount(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100&dword=true&count=513", nil)
 	rec := httptest.NewRecorder()
 
-	handleRead(newTestPLCQueue())(rec, req)
+	handleRead(newTestPLCQueue(t))(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -184,7 +208,7 @@ func TestHandleReadDwordRejectsBitDevice(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/read?addr=M0&dword=true", nil)
 	rec := httptest.NewRecorder()
 
-	handleRead(newTestPLCQueue())(rec, req)
+	handleRead(newTestPLCQueue(t))(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -196,7 +220,7 @@ func TestHandleWriteDwordRejectsBitDevice(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=M0&dword=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newTestPLCQueue(), false)(rec, req)
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -208,7 +232,7 @@ func TestHandleWriteDwordRejectsTooManyValues(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newTestPLCQueue(), false)(rec, req)
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -220,7 +244,7 @@ func TestHandleWriteDwordRejectsOutOfRange(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newTestPLCQueue(), false)(rec, req)
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -232,7 +256,7 @@ func TestHandleWriteDwordRejectsAboveMaxUint32(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newTestPLCQueue(), false)(rec, req)
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -243,7 +267,7 @@ func TestHandleReadSintRejectsBitDevice(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/read?addr=M0&sint=true", nil)
 	rec := httptest.NewRecorder()
 
-	handleRead(newTestPLCQueue())(rec, req)
+	handleRead(newTestPLCQueue(t))(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -255,7 +279,7 @@ func TestHandleWriteSintRejectsBitDevice(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=M0&sint=true", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newTestPLCQueue(), false)(rec, req)
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -267,7 +291,7 @@ func TestHandleWriteSintWordRejectsOutOfRange(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&sint=true", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 
-		handleWrite(newTestPLCQueue(), false)(rec, req)
+		handleWrite(newTestPLCQueue(t), false)(rec, req)
 
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("body=%s status = %d, want %d", body, rec.Code, http.StatusBadRequest)
@@ -280,7 +304,7 @@ func TestHandleWriteSintDwordRejectsOutOfRange(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=true&sint=true", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 
-		handleWrite(newTestPLCQueue(), false)(rec, req)
+		handleWrite(newTestPLCQueue(t), false)(rec, req)
 
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("body=%s status = %d, want %d", body, rec.Code, http.StatusBadRequest)
@@ -292,7 +316,7 @@ func TestHandleWriteReadOnlyRejects(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100", strings.NewReader(`{"values":[1]}`))
 	rec := httptest.NewRecorder()
 
-	handleWrite(newTestPLCQueue(), true)(rec, req)
+	handleWrite(newTestPLCQueue(t), true)(rec, req)
 
 	assertReadOnlyError(t, rec)
 }
@@ -304,11 +328,11 @@ func TestHandleRemoteReadOnlyRejects(t *testing.T) {
 		path    string
 		handler http.HandlerFunc
 	}{
-		{"run", "/remote/run", handleRemoteRun(newTestPLCQueue(), readonly)},
-		{"stop", "/remote/stop", handleRemoteStop(newTestPLCQueue(), readonly)},
-		{"pause", "/remote/pause", handleRemotePause(newTestPLCQueue(), readonly)},
-		{"latch-clear", "/remote/latch-clear", handleRemoteLatchClear(newTestPLCQueue(), readonly)},
-		{"reset", "/remote/reset", handleRemoteReset(newTestPLCQueue(), readonly)},
+		{"run", "/remote/run", handleRemoteRun(newTestPLCQueue(t), readonly)},
+		{"stop", "/remote/stop", handleRemoteStop(newTestPLCQueue(t), readonly)},
+		{"pause", "/remote/pause", handleRemotePause(newTestPLCQueue(t), readonly)},
+		{"latch-clear", "/remote/latch-clear", handleRemoteLatchClear(newTestPLCQueue(t), readonly)},
+		{"reset", "/remote/reset", handleRemoteReset(newTestPLCQueue(t), readonly)},
 	}
 
 	for _, endpoint := range endpoints {
@@ -343,10 +367,7 @@ func TestWriteErrIncludesHTTPStatusCode(t *testing.T) {
 func TestHandleHealthUsesPLCStatusKey(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
-	plcQueue := newTestPLCQueue()
-	defer func() {
-		_ = plcQueue.Shutdown(context.Background())
-	}()
+	plcQueue := newTestPLCQueue(t)
 
 	handleHealth(plcQueue)(rec, req)
 

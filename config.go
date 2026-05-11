@@ -49,11 +49,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 	portStr := fs.String("port", getenvWith(lookupEnv, "PLC_PORT", "5007"), "PLC port")
 	modeStr := fs.String("mode", getenvWith(lookupEnv, "PLC_MODE", "binary"), "PLC mode (binary|ascii)")
 	listen := fs.String("listen", getenvWith(lookupEnv, "LISTEN_ADDR", ":8080"), "HTTP listen address")
-	readonlyDefault, err := getenvBoolWith(lookupEnv, "READONLY", false)
-	if err != nil {
-		return ServerConfig{}, err
-	}
-	readonly := fs.Bool("readonly", readonlyDefault, "disable write and remote-control endpoints")
+	readonly := fs.Bool("readonly", false, "disable write and remote-control endpoints")
 	frameStr := fs.String("frame", getenvWith(lookupEnv, "PLC_FRAME", string(frame3E)), "MC Protocol frame (3e|4e)")
 	transportStr := fs.String("transport", getenvWith(lookupEnv, "PLC_TRANSPORT", string(transportTCP)), "PLC transport (tcp|udp)")
 	queueSizeStr := fs.String("queue-size", getenvWith(lookupEnv, "QUEUE_SIZE", "32"), "PLC communication queue size")
@@ -61,6 +57,20 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 
 	if err := fs.Parse(args); err != nil {
 		return ServerConfig{}, err
+	}
+
+	readonlySet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "readonly" {
+			readonlySet = true
+		}
+	})
+	if !readonlySet {
+		readonlyDefault, err := getenvBoolWith(lookupEnv, "READONLY", false)
+		if err != nil {
+			return ServerConfig{}, err
+		}
+		*readonly = readonlyDefault
 	}
 
 	port, err := strconv.Atoi(*portStr)
