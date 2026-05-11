@@ -340,6 +340,34 @@ func TestWriteErrIncludesHTTPStatusCode(t *testing.T) {
 	}
 }
 
+func TestHandleHealthUsesPLCStatusKey(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	plcQueue := newTestPLCQueue()
+	defer func() {
+		_ = plcQueue.Shutdown(context.Background())
+	}()
+
+	handleHealth(plcQueue)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response body: %v", err)
+	}
+	if _, ok := body["status"]; ok {
+		t.Fatalf("health body must not use status key: %v", body)
+	}
+	if body["plc_status"] != "disconnected" {
+		t.Fatalf("plc_status = %q, want disconnected", body["plc_status"])
+	}
+	if body["connected"] != false {
+		t.Fatalf("connected = %v, want false", body["connected"])
+	}
+}
+
 func TestWritePLCErrBusy(t *testing.T) {
 	rec := httptest.NewRecorder()
 
@@ -531,6 +559,55 @@ func TestWorkQueueRejectsEnqueueAfterShutdown(t *testing.T) {
 	}
 }
 
+func TestWorkQueueAcceptedJobReturnsResultDuringShutdown(t *testing.T) {
+	queue := NewWorkQueue(1)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	result := make(chan workResult, 1)
+
+	go func() {
+		value, err := queue.Do(context.Background(), func() (any, error) {
+			close(started)
+			<-release
+			return "done", nil
+		})
+		result <- workResult{value: value, err: err}
+	}()
+	<-started
+
+	shutdownErr := make(chan error, 1)
+	go func() {
+		shutdownErr <- queue.Shutdown(context.Background())
+	}()
+
+	select {
+	case got := <-result:
+		t.Fatalf("Do returned before active job finished: value=%v err=%v", got.value, got.err)
+	default:
+	}
+	close(release)
+
+	select {
+	case got := <-result:
+		if got.err != nil {
+			t.Fatalf("err = %v, want nil", got.err)
+		}
+		if got.value != "done" {
+			t.Fatalf("value = %v, want done", got.value)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Do did not return active job result")
+	}
+	select {
+	case err := <-shutdownErr:
+		if err != nil {
+			t.Fatalf("shutdown: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not complete")
+	}
+}
+
 func TestWorkQueueSkipsBufferedJobsAfterShutdown(t *testing.T) {
 	queue := &WorkQueue{
 		jobs:       make(chan workJob, 1),
@@ -562,5 +639,63 @@ func TestWorkQueueSkipsBufferedJobsAfterShutdown(t *testing.T) {
 		t.Fatal("buffered job must not run after shutdown")
 	case <-time.After(time.Second):
 		t.Fatal("worker did not stop after shutdown")
+	}
+}
+
+func TestWorkQueueRejectsBufferedDoAfterShutdown(t *testing.T) {
+	queue := NewWorkQueue(1)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	queuedRan := make(chan struct{})
+	queuedResult := make(chan error, 1)
+
+	go func() {
+		_, _ = queue.Do(context.Background(), func() (any, error) {
+			close(started)
+			<-release
+			return nil, nil
+		})
+	}()
+	<-started
+
+	go func() {
+		_, err := queue.Do(context.Background(), func() (any, error) {
+			close(queuedRan)
+			return nil, nil
+		})
+		queuedResult <- err
+	}()
+
+	deadline := time.After(time.Second)
+	for len(queue.jobs) != 1 {
+		select {
+		case <-deadline:
+			t.Fatal("queued job was not accepted")
+		default:
+		}
+	}
+	shutdownErr := make(chan error, 1)
+	go func() {
+		shutdownErr <- queue.Shutdown(context.Background())
+	}()
+	close(release)
+
+	select {
+	case <-queuedRan:
+		t.Fatal("buffered job must not execute after shutdown")
+	case err := <-queuedResult:
+		if !errors.Is(err, errQueueClosed) {
+			t.Fatalf("err = %v, want errQueueClosed", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("queued Do did not return after shutdown")
+	}
+	select {
+	case err := <-shutdownErr:
+		if err != nil {
+			t.Fatalf("shutdown: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not complete")
 	}
 }

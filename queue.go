@@ -74,8 +74,6 @@ func (q *WorkQueue) Do(ctx context.Context, execute func() (any, error)) (any, e
 		return result.value, result.err
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case <-q.done:
-		return nil, errQueueClosed
 	}
 }
 
@@ -106,12 +104,26 @@ func (q *WorkQueue) run() {
 	for {
 		select {
 		case <-q.done:
+			q.rejectPendingJobs()
 			return
 		case job := <-q.jobs:
 			if q.isClosed() {
+				q.finishJob(job, workResult{err: errQueueClosed})
+				q.rejectPendingJobs()
 				return
 			}
 			q.runJob(job)
+		}
+	}
+}
+
+func (q *WorkQueue) rejectPendingJobs() {
+	for {
+		select {
+		case job := <-q.jobs:
+			q.finishJob(job, workResult{err: errQueueClosed})
+		default:
+			return
 		}
 	}
 }
@@ -123,11 +135,13 @@ func (q *WorkQueue) runJob(job workJob) {
 	} else {
 		result.value, result.err = job.execute()
 	}
+	q.finishJob(job, result)
+}
 
+func (q *WorkQueue) finishJob(job workJob, result workResult) {
 	select {
 	case job.result <- result:
 	case <-job.ctx.Done():
-	case <-q.done:
 	}
 }
 

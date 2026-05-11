@@ -92,7 +92,7 @@ All successful write and remote-control operations return:
 
 | Method | Path | Parameters / body | Response |
 | --- | --- | --- | --- |
-| `GET` recommended, not enforced | `/health` | none | `{"status":"ok","connected":true}` or `{"status":"disconnected","connected":false}` |
+| `GET` recommended, not enforced | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1`, `dword` optional and defaults to `false`, `sint` optional and defaults to `false` | `{"values":[100,200]}` or `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` required, `dword` optional and defaults to `false`, `sint` optional and defaults to `false`; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
 | `POST` | `/remote/run` | query: `clear=0/1/2` optional, `force=true/false` optional | `{"ok":true}` |

@@ -80,13 +80,13 @@ func handleHealth(plc *PLCQueue) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		connected := plc.IsConnected()
 
-		status := "ok"
+		plcStatus := "ok"
 		if !connected {
-			status = "disconnected"
+			plcStatus = "disconnected"
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"status":    status,
-			"connected": connected,
+			"plc_status": plcStatus,
+			"connected":  connected,
 		})
 	}
 }
