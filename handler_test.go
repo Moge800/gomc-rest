@@ -699,6 +699,7 @@ func TestWorkQueueRejectsBufferedDoAfterShutdown(t *testing.T) {
 	go func() {
 		shutdownErr <- queue.Shutdown(context.Background())
 	}()
+	waitForWorkQueueClosed(t, queue)
 	close(release)
 
 	select {
@@ -718,5 +719,18 @@ func TestWorkQueueRejectsBufferedDoAfterShutdown(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("shutdown did not complete")
+	}
+}
+
+func waitForWorkQueueClosed(t *testing.T, queue *WorkQueue) {
+	t.Helper()
+	deadline := time.After(time.Second)
+	for !queue.isClosed() {
+		select {
+		case <-deadline:
+			t.Fatal("queue was not marked closed")
+		default:
+			time.Sleep(time.Millisecond)
+		}
 	}
 }
