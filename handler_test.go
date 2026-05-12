@@ -730,6 +730,7 @@ func waitForWorkQueueClosed(t *testing.T, queue *WorkQueue) {
 		case <-deadline:
 			t.Fatal("queue was not marked closed")
 		default:
+			time.Sleep(time.Millisecond)
 		}
 	}
 }
