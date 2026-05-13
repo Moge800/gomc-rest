@@ -72,15 +72,15 @@ Flags take priority. Environment variables provide the default values for those 
 
 | Flag | Environment variable | Default | Notes |
 | --- | --- | --- | --- |
-| `-host` | `PLC_HOST` | `192.168.0.1` | PLC host or IP address |
-| `-port` | `PLC_PORT` | `5007` | PLC port, `1` to `65535` |
-| `-frame` | `PLC_FRAME` | `3e` | MC protocol frame, `3e` or `4e` |
-| `-transport` | `PLC_TRANSPORT` | `tcp` | `tcp` or `udp`; `4e` supports `tcp` only |
-| `-mode` | `PLC_MODE` | `binary` | `binary` or `ascii` |
-| `-queue-size` | `QUEUE_SIZE` | `32` | Number of PLC requests that can wait while one request is active |
-| `-timeout` | `PLC_TIMEOUT` | `5s` | PLC connect and I/O timeout |
-| `-listen` | `LISTEN_ADDR` | `:8080` | HTTP listen address |
-| `-readonly` | `READONLY` | `false` | Set to `true` to reject POST operations on `/write` and `/remote/*` |
+| `-host` | `GOMCR_HOST` | `192.168.0.1` | PLC host or IP address |
+| `-port` | `GOMCR_PORT` | `5007` | PLC port, `1` to `65535` |
+| `-frame` | `GOMCR_FRAME` | `3e` | MC protocol frame, `3e` or `4e` |
+| `-transport` | `GOMCR_TRANSPORT` | `tcp` | `tcp` or `udp`; `4e` supports `tcp` only |
+| `-mode` | `GOMCR_MODE` | `binary` | `binary` or `ascii` |
+| `-queue-size` | `GOMCR_QUEUE_SIZE` | `32` | Number of PLC requests that can wait while one request is active |
+| `-timeout` | `GOMCR_TIMEOUT` | `5s` | PLC connect and I/O timeout |
+| `-listen` | `GOMCR_LISTEN` | `:8080` | HTTP listen address |
+| `-readonly` | `GOMCR_READONLY` | `false` | Set to `true` to reject POST operations on `/write` and `/remote/*` |
 
 ## API Reference
 

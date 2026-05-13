@@ -72,15 +72,15 @@ go build -o gomc-rest .
 
 | フラグ | 環境変数 | デフォルト | 説明 |
 | --- | --- | --- | --- |
-| `-host` | `PLC_HOST` | `192.168.0.1` | PLC のホスト名または IP アドレス |
-| `-port` | `PLC_PORT` | `5007` | PLC ポート、`1` から `65535` |
-| `-frame` | `PLC_FRAME` | `3e` | MC プロトコルフレーム、`3e` または `4e` |
-| `-transport` | `PLC_TRANSPORT` | `tcp` | `tcp` または `udp`。`4e` は `tcp` のみ対応 |
-| `-mode` | `PLC_MODE` | `binary` | `binary` または `ascii` |
-| `-queue-size` | `QUEUE_SIZE` | `32` | 1 件の実行中要求とは別に待機できる PLC 要求数 |
-| `-timeout` | `PLC_TIMEOUT` | `5s` | PLC 接続および I/O timeout |
-| `-listen` | `LISTEN_ADDR` | `:8080` | HTTP 待ち受けアドレス |
-| `-readonly` | `READONLY` | `false` | `true` のとき `/write` と `/remote/*` の POST 操作を拒否 |
+| `-host` | `GOMCR_HOST` | `192.168.0.1` | PLC のホスト名または IP アドレス |
+| `-port` | `GOMCR_PORT` | `5007` | PLC ポート、`1` から `65535` |
+| `-frame` | `GOMCR_FRAME` | `3e` | MC プロトコルフレーム、`3e` または `4e` |
+| `-transport` | `GOMCR_TRANSPORT` | `tcp` | `tcp` または `udp`。`4e` は `tcp` のみ対応 |
+| `-mode` | `GOMCR_MODE` | `binary` | `binary` または `ascii` |
+| `-queue-size` | `GOMCR_QUEUE_SIZE` | `32` | 1 件の実行中要求とは別に待機できる PLC 要求数 |
+| `-timeout` | `GOMCR_TIMEOUT` | `5s` | PLC 接続および I/O timeout |
+| `-listen` | `GOMCR_LISTEN` | `:8080` | HTTP 待ち受けアドレス |
+| `-readonly` | `GOMCR_READONLY` | `false` | `true` のとき `/write` と `/remote/*` の POST 操作を拒否 |
 
 ## API リファレンス
 

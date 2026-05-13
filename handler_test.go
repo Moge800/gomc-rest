@@ -76,21 +76,21 @@ func TestParseConfigRejects4EUDP(t *testing.T) {
 
 func TestParseConfigRejectsInvalidReadOnlyEnv(t *testing.T) {
 	lookupEnv := func(key string) string {
-		if key == "READONLY" {
+		if key == "GOMCR_READONLY" {
 			return "maybe"
 		}
 		return ""
 	}
 
 	_, err := parseConfig(nil, lookupEnv, nil)
-	if err == nil || !strings.Contains(err.Error(), `invalid READONLY "maybe"`) {
-		t.Fatalf("err = %v, want invalid READONLY", err)
+	if err == nil || !strings.Contains(err.Error(), `invalid GOMCR_READONLY "maybe"`) {
+		t.Fatalf("err = %v, want invalid GOMCR_READONLY", err)
 	}
 }
 
 func TestParseConfigReadOnlyFlagOverridesInvalidEnv(t *testing.T) {
 	lookupEnv := func(key string) string {
-		if key == "READONLY" {
+		if key == "GOMCR_READONLY" {
 			return "maybe"
 		}
 		return ""
