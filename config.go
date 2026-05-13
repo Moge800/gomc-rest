@@ -31,7 +31,8 @@ type ServerConfig struct {
 	Mode       mc.Mode
 	ModeString string
 	Listen     string
-	ReadOnly   bool
+	ReadOnly     bool
+	EnableRemote bool
 	Frame      PLCFrame
 	Transport  PLCTransport
 	QueueSize  int
@@ -51,6 +52,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 	modeStr := fs.String("mode", getenvWith(lookupEnv, "GOMCR_MODE", "binary"), "PLC mode (binary|ascii)")
 	listen := fs.String("listen", getenvWith(lookupEnv, "GOMCR_LISTEN", ":8080"), "HTTP listen address")
 	readonly := fs.Bool("readonly", false, "disable write and remote-control endpoints")
+	enableRemote := fs.Bool("enable-remote", false, "enable remote-control endpoints (run/stop/pause/latch-clear/reset)")
 	frameStr := fs.String("frame", getenvWith(lookupEnv, "GOMCR_FRAME", string(frame3E)), "MC Protocol frame (3e|4e)")
 	transportStr := fs.String("transport", getenvWith(lookupEnv, "GOMCR_TRANSPORT", string(transportTCP)), "PLC transport (tcp|udp)")
 	queueSizeStr := fs.String("queue-size", getenvWith(lookupEnv, "GOMCR_QUEUE_SIZE", "32"), "PLC communication queue size")
@@ -61,10 +63,13 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		return ServerConfig{}, err
 	}
 
-	readonlySet := false
+	var readonlySet, enableRemoteSet bool
 	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "readonly" {
+		switch f.Name {
+		case "readonly":
 			readonlySet = true
+		case "enable-remote":
+			enableRemoteSet = true
 		}
 	})
 	if !readonlySet {
@@ -73,6 +78,13 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 			return ServerConfig{}, err
 		}
 		*readonly = readonlyDefault
+	}
+	if !enableRemoteSet {
+		enableRemoteDefault, err := getenvBoolWith(lookupEnv, "GOMCR_ENABLE_REMOTE", false)
+		if err != nil {
+			return ServerConfig{}, err
+		}
+		*enableRemote = enableRemoteDefault
 	}
 
 	port, err := strconv.Atoi(*portStr)
@@ -123,7 +135,8 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		Mode:       mode,
 		ModeString: *modeStr,
 		Listen:     *listen,
-		ReadOnly:   *readonly,
+		ReadOnly:     *readonly,
+		EnableRemote: *enableRemote,
 		Frame:      frame,
 		Transport:  transport,
 		QueueSize:  queueSize,

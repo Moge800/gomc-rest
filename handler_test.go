@@ -372,11 +372,11 @@ func TestHandleRemoteReadOnlyRejects(t *testing.T) {
 		path    string
 		handler http.HandlerFunc
 	}{
-		{"run", "/remote/run", handleRemoteRun(newTestPLCQueue(t), readonly)},
-		{"stop", "/remote/stop", handleRemoteStop(newTestPLCQueue(t), readonly)},
-		{"pause", "/remote/pause", handleRemotePause(newTestPLCQueue(t), readonly)},
-		{"latch-clear", "/remote/latch-clear", handleRemoteLatchClear(newTestPLCQueue(t), readonly)},
-		{"reset", "/remote/reset", handleRemoteReset(newTestPLCQueue(t), readonly)},
+		{"run", "/remote/run", handleRemoteRun(newTestPLCQueue(t), readonly, true)},
+		{"stop", "/remote/stop", handleRemoteStop(newTestPLCQueue(t), readonly, true)},
+		{"pause", "/remote/pause", handleRemotePause(newTestPLCQueue(t), readonly, true)},
+		{"latch-clear", "/remote/latch-clear", handleRemoteLatchClear(newTestPLCQueue(t), readonly, true)},
+		{"reset", "/remote/reset", handleRemoteReset(newTestPLCQueue(t), readonly, true)},
 	}
 
 	for _, endpoint := range endpoints {
@@ -387,6 +387,40 @@ func TestHandleRemoteReadOnlyRejects(t *testing.T) {
 			endpoint.handler(rec, req)
 
 			assertReadOnlyError(t, rec)
+		})
+	}
+}
+
+func TestHandleRemoteDisabledRejects(t *testing.T) {
+	endpoints := []struct {
+		name    string
+		path    string
+		handler http.HandlerFunc
+	}{
+		{"run", "/remote/run", handleRemoteRun(newTestPLCQueue(t), false, false)},
+		{"stop", "/remote/stop", handleRemoteStop(newTestPLCQueue(t), false, false)},
+		{"pause", "/remote/pause", handleRemotePause(newTestPLCQueue(t), false, false)},
+		{"latch-clear", "/remote/latch-clear", handleRemoteLatchClear(newTestPLCQueue(t), false, false)},
+		{"reset", "/remote/reset", handleRemoteReset(newTestPLCQueue(t), false, false)},
+	}
+
+	for _, endpoint := range endpoints {
+		t.Run(endpoint.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, endpoint.path, nil)
+			rec := httptest.NewRecorder()
+
+			endpoint.handler(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+			}
+			var body map[string]any
+			if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if body["code"] != "forbidden" {
+				t.Fatalf("code = %q, want forbidden", body["code"])
+			}
 		})
 	}
 }

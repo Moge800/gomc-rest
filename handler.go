@@ -46,6 +46,14 @@ func requireWritable(w http.ResponseWriter, readonly bool) bool {
 	return false
 }
 
+func requireRemoteEnabled(w http.ResponseWriter, enableRemote bool) bool {
+	if enableRemote {
+		return true
+	}
+	writeErr(w, http.StatusForbidden, "forbidden", "remote-control operations are disabled (use -enable-remote to enable)")
+	return false
+}
+
 func writePLCErr(w http.ResponseWriter, err error) {
 	var busy *busyErr
 	var connErr *connErrWrap
@@ -349,9 +357,12 @@ func handleWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 }
 
 // POST /remote/run?clear=0&force=false
-func handleRemoteRun(plc *PLCQueue, readonly bool) http.HandlerFunc {
+func handleRemoteRun(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
+		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
 		if !requireWritable(w, readonly) {
@@ -377,9 +388,12 @@ func handleRemoteRun(plc *PLCQueue, readonly bool) http.HandlerFunc {
 }
 
 // POST /remote/stop
-func handleRemoteStop(plc *PLCQueue, readonly bool) http.HandlerFunc {
+func handleRemoteStop(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
+		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
 		if !requireWritable(w, readonly) {
@@ -394,9 +408,12 @@ func handleRemoteStop(plc *PLCQueue, readonly bool) http.HandlerFunc {
 }
 
 // POST /remote/pause?force=false
-func handleRemotePause(plc *PLCQueue, readonly bool) http.HandlerFunc {
+func handleRemotePause(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
+		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
 		if !requireWritable(w, readonly) {
@@ -412,9 +429,12 @@ func handleRemotePause(plc *PLCQueue, readonly bool) http.HandlerFunc {
 }
 
 // POST /remote/latch-clear
-func handleRemoteLatchClear(plc *PLCQueue, readonly bool) http.HandlerFunc {
+func handleRemoteLatchClear(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
+		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
 		if !requireWritable(w, readonly) {
@@ -429,9 +449,12 @@ func handleRemoteLatchClear(plc *PLCQueue, readonly bool) http.HandlerFunc {
 }
 
 // POST /remote/reset
-func handleRemoteReset(plc *PLCQueue, readonly bool) http.HandlerFunc {
+func handleRemoteReset(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
+		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
 		if !requireWritable(w, readonly) {

@@ -45,11 +45,11 @@ func main() {
 	mux.HandleFunc("/health", handleHealth(plcQueue))
 	mux.HandleFunc("/read", handleRead(plcQueue))
 	mux.HandleFunc("/write", handleWrite(plcQueue, cfg.ReadOnly))
-	mux.HandleFunc("/remote/run", handleRemoteRun(plcQueue, cfg.ReadOnly))
-	mux.HandleFunc("/remote/stop", handleRemoteStop(plcQueue, cfg.ReadOnly))
-	mux.HandleFunc("/remote/pause", handleRemotePause(plcQueue, cfg.ReadOnly))
-	mux.HandleFunc("/remote/latch-clear", handleRemoteLatchClear(plcQueue, cfg.ReadOnly))
-	mux.HandleFunc("/remote/reset", handleRemoteReset(plcQueue, cfg.ReadOnly))
+	mux.HandleFunc("/remote/run", handleRemoteRun(plcQueue, cfg.ReadOnly, cfg.EnableRemote))
+	mux.HandleFunc("/remote/stop", handleRemoteStop(plcQueue, cfg.ReadOnly, cfg.EnableRemote))
+	mux.HandleFunc("/remote/pause", handleRemotePause(plcQueue, cfg.ReadOnly, cfg.EnableRemote))
+	mux.HandleFunc("/remote/latch-clear", handleRemoteLatchClear(plcQueue, cfg.ReadOnly, cfg.EnableRemote))
+	mux.HandleFunc("/remote/reset", handleRemoteReset(plcQueue, cfg.ReadOnly, cfg.EnableRemote))
 
 	srv := &http.Server{
 		Addr:              cfg.Listen,
@@ -71,6 +71,7 @@ func main() {
 			"transport", cfg.Transport,
 			"mode", cfg.ModeString,
 			"readonly", cfg.ReadOnly,
+			"enable_remote", cfg.EnableRemote,
 			"queue_size", cfg.QueueSize,
 			"timeout", cfg.Timeout,
 		)
