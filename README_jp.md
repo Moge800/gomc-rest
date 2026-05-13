@@ -97,11 +97,11 @@ go build -o gomc-rest .
 | `GET` 推奨、未強制 | `/health` | なし | `{"plc_status":"ok","connected":true}` または `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1`、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false` | `{"values":[100,200]}` または `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` 必須、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false`、body: `{"values":[1,2,3]}` または `{"values":[true,false]}` | `{"ok":true}` |
-| `POST` | `/remote/run` | query: `clear=0/1/2` 任意、`force=true/false` 任意 | `{"ok":true}` |
-| `POST` | `/remote/stop` | なし | `{"ok":true}` |
-| `POST` | `/remote/pause` | query: `force=true/false` 任意 | `{"ok":true}` |
-| `POST` | `/remote/latch-clear` | なし | `{"ok":true}` |
-| `POST` | `/remote/reset` | なし | `{"ok":true}` |
+| `POST` | `/remote/run` | `-enable-remote` が必要。query: `clear=0/1/2` 任意、`force=true/false` 任意 | `{"ok":true}` |
+| `POST` | `/remote/stop` | `-enable-remote` が必要。なし | `{"ok":true}` |
+| `POST` | `/remote/pause` | `-enable-remote` が必要。query: `force=true/false` 任意 | `{"ok":true}` |
+| `POST` | `/remote/latch-clear` | `-enable-remote` が必要。なし | `{"ok":true}` |
+| `POST` | `/remote/reset` | `-enable-remote` が必要。なし | `{"ok":true}` |
 
 補足:
 
@@ -111,6 +111,7 @@ go build -o gomc-rest .
 - ワードデバイスには `0..65535` の整数配列、ビットデバイスには真偽値配列を指定します。
 - `dword=true` を指定すると、各値は符号なし 32 ビット整数（`0..4294967295`）として扱われます。下位 16 ビットは `addr` のレジスタに、上位 16 ビットは次のレジスタ（`addr+1`）に格納されます。`dword=true` はワードデバイスのみ対応しています。`dword=true` の場合、`count` は `512` 以下、`values` の要素数も `512` 以下にしてください（PLC へ送る語数が `1024` を超えないようにするため）。
 - `sint=true` を指定すると、値を符号付き整数として扱います。ワードデバイスは `-32768..32767`、`dword=true` との組み合わせでは `-2147483648..2147483647` の範囲になります。ビットデバイスには使用できません。PLC レジスタのビット列は変わらず、JSON との変換方式のみが変わります。
+- `/remote/*` エンドポイントはデフォルトで無効です。`-enable-remote` なしで呼び出すと `403 forbidden` になります。読み取り専用モードとは独立した設定です。
 - 読み取り専用モードでは `/write` と `/remote/*` の POST 操作は `403 forbidden` になります。読み取り専用モードは安全補助であり、ネットワーク分離、認証、認可、ファイアウォール、PLC 側保護の代替ではありません。
 - `force` は query の値が厳密に `true` のときだけ有効です。
 - `/health` は PLC 未接続時でも常に HTTP `200` を返します。
@@ -134,6 +135,7 @@ go build -o gomc-rest .
 | 状態 | HTTP | `code` | 例 |
 | --- | --- | --- | --- |
 | パラメータ、body、アドレス、count が不正、または POST 専用エンドポイントで method が不正 | `400` または `405` | `bad_request` | `{"status":400,"error":"addr is required","code":"bad_request"}` |
+| `-enable-remote` なしで `/remote/*` を呼び出した | `403` | `forbidden` | `{"status":403,"error":"remote-control operations are disabled (use -enable-remote to enable)","code":"forbidden"}` |
 | 読み取り専用モードで拒否された操作 | `403` | `forbidden` | `{"status":403,"error":"operation not allowed in read-only mode","code":"forbidden"}` |
 | `/write` の body サイズ超過 | `413` | `bad_request` | `{"status":413,"error":"body must not be larger than 1048576 bytes","code":"bad_request"}` |
 | PLC の MC プロトコルエラー、end code あり | `502` | `plc_error` | `{"status":502,"error":"MC error 0x4000","code":"plc_error","end_code":"0x4000"}` |
