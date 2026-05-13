@@ -45,15 +45,15 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 	}
 	fs.SetOutput(output)
 
-	host := fs.String("host", getenvWith(lookupEnv, "PLC_HOST", "192.168.0.1"), "PLC host")
-	portStr := fs.String("port", getenvWith(lookupEnv, "PLC_PORT", "5007"), "PLC port")
-	modeStr := fs.String("mode", getenvWith(lookupEnv, "PLC_MODE", "binary"), "PLC mode (binary|ascii)")
-	listen := fs.String("listen", getenvWith(lookupEnv, "LISTEN_ADDR", ":8080"), "HTTP listen address")
+	host := fs.String("host", getenvWith(lookupEnv, "GOMCR_HOST", "192.168.0.1"), "PLC host")
+	portStr := fs.String("port", getenvWith(lookupEnv, "GOMCR_PORT", "5007"), "PLC port")
+	modeStr := fs.String("mode", getenvWith(lookupEnv, "GOMCR_MODE", "binary"), "PLC mode (binary|ascii)")
+	listen := fs.String("listen", getenvWith(lookupEnv, "GOMCR_LISTEN", ":8080"), "HTTP listen address")
 	readonly := fs.Bool("readonly", false, "disable write and remote-control endpoints")
-	frameStr := fs.String("frame", getenvWith(lookupEnv, "PLC_FRAME", string(frame3E)), "MC Protocol frame (3e|4e)")
-	transportStr := fs.String("transport", getenvWith(lookupEnv, "PLC_TRANSPORT", string(transportTCP)), "PLC transport (tcp|udp)")
-	queueSizeStr := fs.String("queue-size", getenvWith(lookupEnv, "QUEUE_SIZE", "32"), "PLC communication queue size")
-	timeoutStr := fs.String("timeout", getenvWith(lookupEnv, "PLC_TIMEOUT", "5s"), "PLC communication timeout")
+	frameStr := fs.String("frame", getenvWith(lookupEnv, "GOMCR_FRAME", string(frame3E)), "MC Protocol frame (3e|4e)")
+	transportStr := fs.String("transport", getenvWith(lookupEnv, "GOMCR_TRANSPORT", string(transportTCP)), "PLC transport (tcp|udp)")
+	queueSizeStr := fs.String("queue-size", getenvWith(lookupEnv, "GOMCR_QUEUE_SIZE", "32"), "PLC communication queue size")
+	timeoutStr := fs.String("timeout", getenvWith(lookupEnv, "GOMCR_TIMEOUT", "5s"), "PLC communication timeout")
 
 	if err := fs.Parse(args); err != nil {
 		return ServerConfig{}, err
@@ -66,7 +66,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		}
 	})
 	if !readonlySet {
-		readonlyDefault, err := getenvBoolWith(lookupEnv, "READONLY", false)
+		readonlyDefault, err := getenvBoolWith(lookupEnv, "GOMCR_READONLY", false)
 		if err != nil {
 			return ServerConfig{}, err
 		}
