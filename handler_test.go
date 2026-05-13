@@ -74,6 +74,48 @@ func TestParseConfigRejects4EUDP(t *testing.T) {
 	}
 }
 
+func TestParseConfigLogFileFlag(t *testing.T) {
+	cfg, err := parseConfig([]string{"-log-file", "/tmp/test.log"}, emptyEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if cfg.LogFile != "/tmp/test.log" {
+		t.Fatalf("LogFile = %q, want /tmp/test.log", cfg.LogFile)
+	}
+}
+
+func TestParseConfigLogFileEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_LOG_FILE" {
+			return "/var/log/gomc.log"
+		}
+		return ""
+	}
+	cfg, err := parseConfig(nil, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if cfg.LogFile != "/var/log/gomc.log" {
+		t.Fatalf("LogFile = %q, want /var/log/gomc.log", cfg.LogFile)
+	}
+}
+
+func TestParseConfigLogFileFlagOverridesEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_LOG_FILE" {
+			return "/env/path.log"
+		}
+		return ""
+	}
+	cfg, err := parseConfig([]string{"-log-file", "/flag/path.log"}, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if cfg.LogFile != "/flag/path.log" {
+		t.Fatalf("LogFile = %q, want /flag/path.log", cfg.LogFile)
+	}
+}
+
 func TestParseConfigRejectsInvalidReadOnlyEnv(t *testing.T) {
 	lookupEnv := func(key string) string {
 		if key == "GOMCR_READONLY" {
