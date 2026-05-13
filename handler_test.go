@@ -421,7 +421,55 @@ func TestHandleRemoteDisabledRejects(t *testing.T) {
 			if body["code"] != "forbidden" {
 				t.Fatalf("code = %q, want forbidden", body["code"])
 			}
+			if body["error"] != "remote-control operations are disabled (use -enable-remote to enable)" {
+				t.Fatalf("error = %q, want remote-control disabled message", body["error"])
+			}
 		})
+	}
+}
+
+func TestParseConfigEnableRemoteEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_ENABLE_REMOTE" {
+			return "true"
+		}
+		return ""
+	}
+	cfg, err := parseConfig(nil, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if !cfg.EnableRemote {
+		t.Fatal("EnableRemote = false, want true")
+	}
+}
+
+func TestParseConfigRejectsInvalidEnableRemoteEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_ENABLE_REMOTE" {
+			return "yes"
+		}
+		return ""
+	}
+	_, err := parseConfig(nil, lookupEnv, nil)
+	if err == nil || !strings.Contains(err.Error(), `invalid GOMCR_ENABLE_REMOTE "yes"`) {
+		t.Fatalf("err = %v, want invalid GOMCR_ENABLE_REMOTE", err)
+	}
+}
+
+func TestParseConfigEnableRemoteFlagOverridesInvalidEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_ENABLE_REMOTE" {
+			return "yes"
+		}
+		return ""
+	}
+	cfg, err := parseConfig([]string{"-enable-remote"}, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if !cfg.EnableRemote {
+		t.Fatal("EnableRemote = false, want true")
 	}
 }
 

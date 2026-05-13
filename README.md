@@ -182,6 +182,7 @@ curl -X POST "http://localhost:8080/write?addr=M0" \
   -H "Content-Type: application/json" \
   -d '{"values":[true,false]}'
 
+# Remote-control endpoints require -enable-remote at startup
 curl -X POST "http://localhost:8080/remote/run?clear=0&force=false"
 curl -X POST "http://localhost:8080/remote/stop"
 curl -X POST "http://localhost:8080/remote/pause?force=false"
