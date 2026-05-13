@@ -75,7 +75,8 @@ func main() {
 			"timeout", cfg.Timeout,
 		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("http: %v", err)
+			slog.Error("http server error", "error", err)
+			os.Exit(1)
 		}
 	}()
 
