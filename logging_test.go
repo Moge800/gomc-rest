@@ -1,12 +1,19 @@
 package main
 
 import (
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 func TestLogRequestsStatusCode(t *testing.T) {
+	// Redirect slog to discard so test output stays clean.
+	orig := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	t.Cleanup(func() { slog.SetDefault(orig) })
+
 	cases := []struct {
 		name       string
 		handler    http.HandlerFunc
