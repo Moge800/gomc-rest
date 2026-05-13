@@ -5,7 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,6 +23,18 @@ func main() {
 		}
 		log.Fatal(err)
 	}
+
+	// setup logger
+	logOut := io.Writer(os.Stderr)
+	if cfg.LogFile != "" {
+		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatalf("open log file: %v", err)
+		}
+		defer f.Close()
+		logOut = io.MultiWriter(os.Stderr, f)
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(logOut, nil)))
 
 	plc := newConfiguredPLCClient(cfg)
 	plcQueue := newPLCQueue(plc, cfg.QueueSize)
@@ -38,7 +52,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           mux,
+		Handler:           logRequests(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -49,22 +63,31 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		fmt.Printf("listening on %s  plc=%s:%d frame=%s transport=%s mode=%s readonly=%t queue_size=%d timeout=%s\n", cfg.Listen, cfg.Host, cfg.Port, cfg.Frame, cfg.Transport, cfg.ModeString, cfg.ReadOnly, cfg.QueueSize, cfg.Timeout)
+		slog.Info("listening",
+			"addr", cfg.Listen,
+			"plc", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+			"frame", cfg.Frame,
+			"transport", cfg.Transport,
+			"mode", cfg.ModeString,
+			"readonly", cfg.ReadOnly,
+			"queue_size", cfg.QueueSize,
+			"timeout", cfg.Timeout,
+		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http: %v", err)
 		}
 	}()
 
 	<-quit
-	fmt.Println("\nshutting down...")
+	slog.Info("shutting down")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("shutdown error: %v", err)
+		slog.Error("shutdown error", "error", err)
 	}
 	if err := plcQueue.Shutdown(ctx); err != nil {
-		log.Printf("queue shutdown error: %v", err)
+		slog.Error("queue shutdown error", "error", err)
 	}
 	plcQueue.Close()
 }

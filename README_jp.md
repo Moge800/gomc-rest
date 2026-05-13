@@ -81,6 +81,7 @@ go build -o gomc-rest .
 | `-timeout` | `GOMCR_TIMEOUT` | `5s` | PLC 接続および I/O timeout |
 | `-listen` | `GOMCR_LISTEN` | `:8080` | HTTP 待ち受けアドレス |
 | `-readonly` | `GOMCR_READONLY` | `false` | `true` のとき `/write` と `/remote/*` の POST 操作を拒否 |
+| `-log-file` | `GOMCR_LOG_FILE` | _(なし)_ | ログファイルのパス。指定するとファイルと stderr の両方に出力 |
 
 ## API リファレンス
 

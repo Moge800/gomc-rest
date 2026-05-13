@@ -36,6 +36,7 @@ type ServerConfig struct {
 	Transport  PLCTransport
 	QueueSize  int
 	Timeout    time.Duration
+	LogFile    string
 }
 
 func parseConfig(args []string, lookupEnv func(string) string, output io.Writer) (ServerConfig, error) {
@@ -54,6 +55,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 	transportStr := fs.String("transport", getenvWith(lookupEnv, "GOMCR_TRANSPORT", string(transportTCP)), "PLC transport (tcp|udp)")
 	queueSizeStr := fs.String("queue-size", getenvWith(lookupEnv, "GOMCR_QUEUE_SIZE", "32"), "PLC communication queue size")
 	timeoutStr := fs.String("timeout", getenvWith(lookupEnv, "GOMCR_TIMEOUT", "5s"), "PLC communication timeout")
+	logFile := fs.String("log-file", getenvWith(lookupEnv, "GOMCR_LOG_FILE", ""), "path to log file (empty = console only)")
 
 	if err := fs.Parse(args); err != nil {
 		return ServerConfig{}, err
@@ -126,6 +128,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		Transport:  transport,
 		QueueSize:  queueSize,
 		Timeout:    timeout,
+		LogFile:    *logFile,
 	}, nil
 }
 
