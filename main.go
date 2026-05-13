@@ -29,7 +29,7 @@ func main() {
 	if cfg.LogFile != "" {
 		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
-			log.Fatalf("open log file: %v", err)
+			log.Fatalf("open log file %q: %v", cfg.LogFile, err)
 		}
 		defer f.Close()
 		logOut = io.MultiWriter(os.Stderr, f)

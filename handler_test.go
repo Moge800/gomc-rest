@@ -75,12 +75,13 @@ func TestParseConfigRejects4EUDP(t *testing.T) {
 }
 
 func TestParseConfigLogFileFlag(t *testing.T) {
-	cfg, err := parseConfig([]string{"-log-file", "/tmp/test.log"}, emptyEnv, nil)
+	path := t.TempDir() + "/test.log"
+	cfg, err := parseConfig([]string{"-log-file", path}, emptyEnv, nil)
 	if err != nil {
 		t.Fatalf("parseConfig: %v", err)
 	}
-	if cfg.LogFile != "/tmp/test.log" {
-		t.Fatalf("LogFile = %q, want /tmp/test.log", cfg.LogFile)
+	if cfg.LogFile != path {
+		t.Fatalf("LogFile = %q, want %q", cfg.LogFile, path)
 	}
 }
 
@@ -101,18 +102,19 @@ func TestParseConfigLogFileEnv(t *testing.T) {
 }
 
 func TestParseConfigLogFileFlagOverridesEnv(t *testing.T) {
+	flagPath := t.TempDir() + "/flag.log"
 	lookupEnv := func(key string) string {
 		if key == "GOMCR_LOG_FILE" {
-			return "/env/path.log"
+			return t.TempDir() + "/env.log"
 		}
 		return ""
 	}
-	cfg, err := parseConfig([]string{"-log-file", "/flag/path.log"}, lookupEnv, nil)
+	cfg, err := parseConfig([]string{"-log-file", flagPath}, lookupEnv, nil)
 	if err != nil {
 		t.Fatalf("parseConfig: %v", err)
 	}
-	if cfg.LogFile != "/flag/path.log" {
-		t.Fatalf("LogFile = %q, want /flag/path.log", cfg.LogFile)
+	if cfg.LogFile != flagPath {
+		t.Fatalf("LogFile = %q, want %q", cfg.LogFile, flagPath)
 	}
 }
 
