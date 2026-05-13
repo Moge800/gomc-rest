@@ -27,13 +27,14 @@ func main() {
 	// setup logger
 	logOut := io.Writer(os.Stderr)
 	if cfg.LogFile != "" {
-		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
 			log.Fatalf("open log file: %v", err)
 		}
 		defer f.Close()
 		logOut = io.MultiWriter(os.Stderr, f)
 	}
+	log.SetOutput(logOut)
 	slog.SetDefault(slog.New(slog.NewTextHandler(logOut, nil)))
 
 	plc := newConfiguredPLCClient(cfg)
