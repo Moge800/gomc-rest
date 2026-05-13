@@ -362,10 +362,10 @@ func handleRemoteRun(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFun
 		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
-		if !requireRemoteEnabled(w, enableRemote) {
+		if !requireWritable(w, readonly) {
 			return
 		}
-		if !requireWritable(w, readonly) {
+		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
 		clear := 0
@@ -393,10 +393,10 @@ func handleRemoteStop(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFu
 		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
-		if !requireRemoteEnabled(w, enableRemote) {
+		if !requireWritable(w, readonly) {
 			return
 		}
-		if !requireWritable(w, readonly) {
+		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
 		if err := plc.RemoteStop(r.Context()); err != nil {
@@ -413,10 +413,10 @@ func handleRemotePause(plc *PLCQueue, readonly, enableRemote bool) http.HandlerF
 		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
-		if !requireRemoteEnabled(w, enableRemote) {
+		if !requireWritable(w, readonly) {
 			return
 		}
-		if !requireWritable(w, readonly) {
+		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
 		force := r.URL.Query().Get("force") == "true"
@@ -434,10 +434,10 @@ func handleRemoteLatchClear(plc *PLCQueue, readonly, enableRemote bool) http.Han
 		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
-		if !requireRemoteEnabled(w, enableRemote) {
+		if !requireWritable(w, readonly) {
 			return
 		}
-		if !requireWritable(w, readonly) {
+		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
 		if err := plc.RemoteLatchClear(r.Context()); err != nil {
@@ -454,10 +454,10 @@ func handleRemoteReset(plc *PLCQueue, readonly, enableRemote bool) http.HandlerF
 		if !requireMethod(w, r, http.MethodPost) {
 			return
 		}
-		if !requireRemoteEnabled(w, enableRemote) {
+		if !requireWritable(w, readonly) {
 			return
 		}
-		if !requireWritable(w, readonly) {
+		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
 		if err := plc.RemoteReset(r.Context()); err != nil {
