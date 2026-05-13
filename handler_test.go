@@ -74,6 +74,50 @@ func TestParseConfigRejects4EUDP(t *testing.T) {
 	}
 }
 
+func TestParseConfigLogFileFlag(t *testing.T) {
+	path := t.TempDir() + "/test.log"
+	cfg, err := parseConfig([]string{"-log-file", path}, emptyEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if cfg.LogFile != path {
+		t.Fatalf("LogFile = %q, want %q", cfg.LogFile, path)
+	}
+}
+
+func TestParseConfigLogFileEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_LOG_FILE" {
+			return "/var/log/gomc.log"
+		}
+		return ""
+	}
+	cfg, err := parseConfig(nil, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if cfg.LogFile != "/var/log/gomc.log" {
+		t.Fatalf("LogFile = %q, want /var/log/gomc.log", cfg.LogFile)
+	}
+}
+
+func TestParseConfigLogFileFlagOverridesEnv(t *testing.T) {
+	flagPath := t.TempDir() + "/flag.log"
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_LOG_FILE" {
+			return t.TempDir() + "/env.log"
+		}
+		return ""
+	}
+	cfg, err := parseConfig([]string{"-log-file", flagPath}, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if cfg.LogFile != flagPath {
+		t.Fatalf("LogFile = %q, want %q", cfg.LogFile, flagPath)
+	}
+}
+
 func TestParseConfigRejectsInvalidReadOnlyEnv(t *testing.T) {
 	lookupEnv := func(key string) string {
 		if key == "GOMCR_READONLY" {
@@ -328,11 +372,11 @@ func TestHandleRemoteReadOnlyRejects(t *testing.T) {
 		path    string
 		handler http.HandlerFunc
 	}{
-		{"run", "/remote/run", handleRemoteRun(newTestPLCQueue(t), readonly)},
-		{"stop", "/remote/stop", handleRemoteStop(newTestPLCQueue(t), readonly)},
-		{"pause", "/remote/pause", handleRemotePause(newTestPLCQueue(t), readonly)},
-		{"latch-clear", "/remote/latch-clear", handleRemoteLatchClear(newTestPLCQueue(t), readonly)},
-		{"reset", "/remote/reset", handleRemoteReset(newTestPLCQueue(t), readonly)},
+		{"run", "/remote/run", handleRemoteRun(newTestPLCQueue(t), readonly, true)},
+		{"stop", "/remote/stop", handleRemoteStop(newTestPLCQueue(t), readonly, true)},
+		{"pause", "/remote/pause", handleRemotePause(newTestPLCQueue(t), readonly, true)},
+		{"latch-clear", "/remote/latch-clear", handleRemoteLatchClear(newTestPLCQueue(t), readonly, true)},
+		{"reset", "/remote/reset", handleRemoteReset(newTestPLCQueue(t), readonly, true)},
 	}
 
 	for _, endpoint := range endpoints {
@@ -344,6 +388,88 @@ func TestHandleRemoteReadOnlyRejects(t *testing.T) {
 
 			assertReadOnlyError(t, rec)
 		})
+	}
+}
+
+func TestHandleRemoteDisabledRejects(t *testing.T) {
+	endpoints := []struct {
+		name    string
+		path    string
+		handler http.HandlerFunc
+	}{
+		{"run", "/remote/run", handleRemoteRun(newTestPLCQueue(t), false, false)},
+		{"stop", "/remote/stop", handleRemoteStop(newTestPLCQueue(t), false, false)},
+		{"pause", "/remote/pause", handleRemotePause(newTestPLCQueue(t), false, false)},
+		{"latch-clear", "/remote/latch-clear", handleRemoteLatchClear(newTestPLCQueue(t), false, false)},
+		{"reset", "/remote/reset", handleRemoteReset(newTestPLCQueue(t), false, false)},
+	}
+
+	for _, endpoint := range endpoints {
+		t.Run(endpoint.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, endpoint.path, nil)
+			rec := httptest.NewRecorder()
+
+			endpoint.handler(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+			}
+			var body map[string]any
+			if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if body["code"] != "forbidden" {
+				t.Fatalf("code = %q, want forbidden", body["code"])
+			}
+			if body["error"] != "remote-control operations are disabled (use -enable-remote to enable)" {
+				t.Fatalf("error = %q, want remote-control disabled message", body["error"])
+			}
+		})
+	}
+}
+
+func TestParseConfigEnableRemoteEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_ENABLE_REMOTE" {
+			return "true"
+		}
+		return ""
+	}
+	cfg, err := parseConfig(nil, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if !cfg.EnableRemote {
+		t.Fatal("EnableRemote = false, want true")
+	}
+}
+
+func TestParseConfigRejectsInvalidEnableRemoteEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_ENABLE_REMOTE" {
+			return "yes"
+		}
+		return ""
+	}
+	_, err := parseConfig(nil, lookupEnv, nil)
+	if err == nil || !strings.Contains(err.Error(), `invalid GOMCR_ENABLE_REMOTE "yes"`) {
+		t.Fatalf("err = %v, want invalid GOMCR_ENABLE_REMOTE", err)
+	}
+}
+
+func TestParseConfigEnableRemoteFlagOverridesInvalidEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_ENABLE_REMOTE" {
+			return "yes"
+		}
+		return ""
+	}
+	cfg, err := parseConfig([]string{"-enable-remote"}, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if !cfg.EnableRemote {
+		t.Fatal("EnableRemote = false, want true")
 	}
 }
 

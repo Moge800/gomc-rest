@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -94,7 +95,7 @@ func (p *PLCClient) initialConnect() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if err := p.reconnect(); err != nil {
-		fmt.Printf("PLC initial connect failed: %v (will retry on first request)\n", err)
+		slog.Warn("PLC initial connect failed, will retry on first request", "error", err)
 	}
 }
 
