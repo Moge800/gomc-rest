@@ -83,6 +83,7 @@ go build -o gomc-rest .
 | `-readonly` | `GOMCR_READONLY` | `false` | `true` のとき `/write` と `/remote/*` の POST 操作を拒否 |
 | `-enable-remote` | `GOMCR_ENABLE_REMOTE` | `false` | `true` のとき `/remote/*` エンドポイントを有効化 |
 | `-log-file` | `GOMCR_LOG_FILE` | _(なし)_ | ログファイルのパス。指定するとファイルと stderr の両方に出力 |
+| `-verbose` | `GOMCR_VERBOSE` | `false` | `true` のとき PLC 操作ごとのデバッグログ（`plc_op` エントリ）を出力 |
 
 ## API リファレンス
 
@@ -95,6 +96,7 @@ go build -o gomc-rest .
 | Method | Path | パラメータ / body | レスポンス |
 | --- | --- | --- | --- |
 | `GET` 推奨、未強制 | `/version` | なし | `{"version":"v0.5.0"}` またはローカルビルドでは `{"version":"dev"}` |
+| `GET` 推奨、未強制 | `/metrics` | なし | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
 | `GET` 推奨、未強制 | `/health` | なし | `{"plc_status":"ok","connected":true}` または `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1`、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false` | `{"values":[100,200]}` または `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` 必須、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false`、body: `{"values":[1,2,3]}` または `{"values":[true,false]}` | `{"ok":true}` |

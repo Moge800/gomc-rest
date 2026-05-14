@@ -83,6 +83,7 @@ Flags take priority. Environment variables provide the default values for those 
 | `-readonly` | `GOMCR_READONLY` | `false` | Set to `true` to reject POST operations on `/write` and `/remote/*` |
 | `-enable-remote` | `GOMCR_ENABLE_REMOTE` | `false` | Set to `true` to enable remote-control endpoints (`/remote/*`) |
 | `-log-file` | `GOMCR_LOG_FILE` | _(none)_ | Path to log file; if set, logs are written to both the file and stderr |
+| `-verbose` | `GOMCR_VERBOSE` | `false` | Set to `true` to enable debug-level PLC operation logging (`plc_op` entries per request) |
 
 ## API Reference
 
@@ -95,6 +96,7 @@ All successful write and remote-control operations return:
 | Method | Path | Parameters / body | Response |
 | --- | --- | --- | --- |
 | `GET` recommended, not enforced | `/version` | none | `{"version":"v0.5.0"}` or `{"version":"dev"}` for local builds |
+| `GET` recommended, not enforced | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
 | `GET` recommended, not enforced | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1`, `dword` optional and defaults to `false`, `sint` optional and defaults to `false` | `{"values":[100,200]}` or `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` required, `dword` optional and defaults to `false`, `sint` optional and defaults to `false`; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |

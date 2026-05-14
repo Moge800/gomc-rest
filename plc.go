@@ -30,8 +30,9 @@ type plcDialer interface {
 }
 
 type PLCClient struct {
-	mu   sync.Mutex
-	conn plcConnection // nil = disconnected
+	mu      sync.Mutex
+	conn    plcConnection // nil = disconnected
+	metrics plcMetrics
 
 	host      string
 	port      int
@@ -64,6 +65,7 @@ func newConfiguredPLCClient(cfg ServerConfig) *PLCClient {
 }
 
 func (p *PLCClient) reconnect() error {
+	p.metrics.reconnects.Add(1)
 	c, err := p.newConnection()
 	if err != nil {
 		return err
@@ -118,15 +120,21 @@ func (p *PLCClient) do(fn func(plcConnection) error) error {
 
 	if p.conn == nil {
 		if err := p.reconnect(); err != nil {
+			p.metrics.plcErrors.Add(1)
 			return &connErrWrap{err}
 		}
 	}
 
+	p.metrics.requests.Add(1)
+	start := time.Now()
 	err := fn(p.conn)
+	p.metrics.totalNs.Add(time.Since(start).Nanoseconds())
+
 	if err == nil {
 		return nil
 	}
 
+	p.metrics.plcErrors.Add(1)
 	var connErr *mc.MCProtocolConnectionError
 	if errors.As(err, &connErr) {
 		p.conn = nil
@@ -152,17 +160,24 @@ func (p *PLCClient) doReset() error {
 
 	if p.conn == nil {
 		if err := p.reconnect(); err != nil {
+			p.metrics.plcErrors.Add(1)
 			return &connErrWrap{err}
 		}
 	}
 
+	p.metrics.requests.Add(1)
+	start := time.Now()
 	err := p.conn.RemoteReset()
+	p.metrics.totalNs.Add(time.Since(start).Nanoseconds())
 	p.conn = nil // PLC closes connection on reset regardless of error
+
 	var connErr *mc.MCProtocolConnectionError
 	if errors.As(err, &connErr) {
+		p.metrics.plcErrors.Add(1)
 		return &connErrWrap{err}
 	}
 	if err != nil {
+		p.metrics.plcErrors.Add(1)
 		return err
 	}
 	return nil

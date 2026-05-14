@@ -473,6 +473,32 @@ func TestParseConfigEnableRemoteFlagOverridesInvalidEnv(t *testing.T) {
 	}
 }
 
+func TestParseConfigVerboseFlag(t *testing.T) {
+	cfg, err := parseConfig([]string{"-verbose"}, emptyEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if !cfg.Verbose {
+		t.Fatal("Verbose = false, want true")
+	}
+}
+
+func TestParseConfigVerboseEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_VERBOSE" {
+			return "true"
+		}
+		return ""
+	}
+	cfg, err := parseConfig(nil, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if !cfg.Verbose {
+		t.Fatal("Verbose = false, want true")
+	}
+}
+
 func TestWriteErrIncludesHTTPStatusCode(t *testing.T) {
 	rec := httptest.NewRecorder()
 
@@ -867,6 +893,32 @@ func TestHandleVersion(t *testing.T) {
 	}
 	if body["version"] != "v1.2.3" {
 		t.Fatalf("version = %v, want v1.2.3", body["version"])
+	}
+}
+
+func TestHandleMetrics(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+
+	handleMetrics(newTestPLCQueue(t))(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, key := range []string{"request_count", "reconnect_count", "plc_error_count", "avg_latency_ms", "queue_length"} {
+		if _, ok := body[key]; !ok {
+			t.Errorf("missing field %q", key)
+		}
+	}
+	if body["request_count"] != float64(0) {
+		t.Errorf("request_count = %v, want 0", body["request_count"])
+	}
+	if body["avg_latency_ms"] != float64(0) {
+		t.Errorf("avg_latency_ms = %v, want 0", body["avg_latency_ms"])
 	}
 }
 
