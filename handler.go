@@ -83,6 +83,13 @@ func writePLCErr(w http.ResponseWriter, err error) {
 	}
 }
 
+// GET /version
+func handleVersion() http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"version": version})
+	}
+}
+
 // GET /health
 func handleHealth(plc *PLCQueue) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {

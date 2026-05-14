@@ -42,6 +42,7 @@ func main() {
 	plcQueue.InitialConnect()
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/version", handleVersion())
 	mux.HandleFunc("/health", handleHealth(plcQueue))
 	mux.HandleFunc("/read", handleRead(plcQueue))
 	mux.HandleFunc("/write", handleWrite(plcQueue, cfg.ReadOnly))
@@ -65,6 +66,7 @@ func main() {
 
 	go func() {
 		slog.Info("listening",
+			"version", version,
 			"addr", cfg.Listen,
 			"plc", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 			"frame", cfg.Frame,
