@@ -95,6 +95,7 @@ All successful write and remote-control operations return:
 | Method | Path | Parameters / body | Response |
 | --- | --- | --- | --- |
 | `GET` recommended, not enforced | `/version` | none | `{"version":"v0.5.0"}` or `{"version":"dev"}` for local builds |
+| `GET` recommended, not enforced | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
 | `GET` recommended, not enforced | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1`, `dword` optional and defaults to `false`, `sint` optional and defaults to `false` | `{"values":[100,200]}` or `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` required, `dword` optional and defaults to `false`, `sint` optional and defaults to `false`; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |

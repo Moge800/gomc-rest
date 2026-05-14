@@ -870,6 +870,32 @@ func TestHandleVersion(t *testing.T) {
 	}
 }
 
+func TestHandleMetrics(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+
+	handleMetrics(newTestPLCQueue(t))(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, key := range []string{"request_count", "reconnect_count", "plc_error_count", "avg_latency_ms", "queue_length"} {
+		if _, ok := body[key]; !ok {
+			t.Errorf("missing field %q", key)
+		}
+	}
+	if body["request_count"] != float64(0) {
+		t.Errorf("request_count = %v, want 0", body["request_count"])
+	}
+	if body["avg_latency_ms"] != float64(0) {
+		t.Errorf("avg_latency_ms = %v, want 0", body["avg_latency_ms"])
+	}
+}
+
 func waitForWorkQueueClosed(t *testing.T, queue *WorkQueue) {
 	t.Helper()
 	deadline := time.After(time.Second)

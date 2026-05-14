@@ -43,6 +43,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/version", handleVersion())
+	mux.HandleFunc("/metrics", handleMetrics(plcQueue))
 	mux.HandleFunc("/health", handleHealth(plcQueue))
 	mux.HandleFunc("/read", handleRead(plcQueue))
 	mux.HandleFunc("/write", handleWrite(plcQueue, cfg.ReadOnly))
