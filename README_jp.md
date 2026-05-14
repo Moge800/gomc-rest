@@ -83,6 +83,7 @@ go build -o gomc-rest .
 | `-readonly` | `GOMCR_READONLY` | `false` | `true` のとき `/write` と `/remote/*` の POST 操作を拒否 |
 | `-enable-remote` | `GOMCR_ENABLE_REMOTE` | `false` | `true` のとき `/remote/*` エンドポイントを有効化 |
 | `-log-file` | `GOMCR_LOG_FILE` | _(なし)_ | ログファイルのパス。指定するとファイルと stderr の両方に出力 |
+| `-verbose` | `GOMCR_VERBOSE` | `false` | `true` のとき PLC 操作ごとのデバッグログ（`plc_op` エントリ）を出力 |
 
 ## API リファレンス
 

@@ -35,7 +35,11 @@ func main() {
 		logOut = io.MultiWriter(os.Stderr, f)
 	}
 	log.SetOutput(logOut)
-	slog.SetDefault(slog.New(slog.NewTextHandler(logOut, nil)))
+	logLevel := slog.LevelInfo
+	if cfg.Verbose {
+		logLevel = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: logLevel})))
 
 	plc := newConfiguredPLCClient(cfg)
 	plcQueue := newPLCQueue(plc, cfg.QueueSize)
@@ -75,6 +79,7 @@ func main() {
 			"mode", cfg.ModeString,
 			"readonly", cfg.ReadOnly,
 			"enable_remote", cfg.EnableRemote,
+			"verbose", cfg.Verbose,
 			"queue_size", cfg.QueueSize,
 			"timeout", cfg.Timeout,
 		)

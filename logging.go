@@ -34,7 +34,7 @@ func logPLCOp(addr string, d time.Duration, err error) {
 			result = "error"
 		}
 	}
-	slog.Info("plc_op",
+	slog.Debug("plc_op",
 		"addr", addr,
 		"latency_ms", d.Milliseconds(),
 		"result", result,

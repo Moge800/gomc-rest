@@ -83,6 +83,7 @@ Flags take priority. Environment variables provide the default values for those 
 | `-readonly` | `GOMCR_READONLY` | `false` | Set to `true` to reject POST operations on `/write` and `/remote/*` |
 | `-enable-remote` | `GOMCR_ENABLE_REMOTE` | `false` | Set to `true` to enable remote-control endpoints (`/remote/*`) |
 | `-log-file` | `GOMCR_LOG_FILE` | _(none)_ | Path to log file; if set, logs are written to both the file and stderr |
+| `-verbose` | `GOMCR_VERBOSE` | `false` | Set to `true` to enable debug-level PLC operation logging (`plc_op` entries per request) |
 
 ## API Reference
 

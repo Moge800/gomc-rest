@@ -473,6 +473,32 @@ func TestParseConfigEnableRemoteFlagOverridesInvalidEnv(t *testing.T) {
 	}
 }
 
+func TestParseConfigVerboseFlag(t *testing.T) {
+	cfg, err := parseConfig([]string{"-verbose"}, emptyEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if !cfg.Verbose {
+		t.Fatal("Verbose = false, want true")
+	}
+}
+
+func TestParseConfigVerboseEnv(t *testing.T) {
+	lookupEnv := func(key string) string {
+		if key == "GOMCR_VERBOSE" {
+			return "true"
+		}
+		return ""
+	}
+	cfg, err := parseConfig(nil, lookupEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if !cfg.Verbose {
+		t.Fatal("Verbose = false, want true")
+	}
+}
+
 func TestWriteErrIncludesHTTPStatusCode(t *testing.T) {
 	rec := httptest.NewRecorder()
 

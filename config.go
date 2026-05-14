@@ -33,6 +33,7 @@ type ServerConfig struct {
 	Listen     string
 	ReadOnly     bool
 	EnableRemote bool
+	Verbose      bool
 	Frame      PLCFrame
 	Transport  PLCTransport
 	QueueSize  int
@@ -53,6 +54,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 	listen := fs.String("listen", getenvWith(lookupEnv, "GOMCR_LISTEN", ":8080"), "HTTP listen address")
 	readonly := fs.Bool("readonly", false, "disable write and remote-control endpoints")
 	enableRemote := fs.Bool("enable-remote", false, "enable remote-control endpoints (run/stop/pause/latch-clear/reset)")
+	verbose := fs.Bool("verbose", false, "enable debug-level PLC operation logging")
 	frameStr := fs.String("frame", getenvWith(lookupEnv, "GOMCR_FRAME", string(frame3E)), "MC Protocol frame (3e|4e)")
 	transportStr := fs.String("transport", getenvWith(lookupEnv, "GOMCR_TRANSPORT", string(transportTCP)), "PLC transport (tcp|udp)")
 	queueSizeStr := fs.String("queue-size", getenvWith(lookupEnv, "GOMCR_QUEUE_SIZE", "32"), "PLC communication queue size")
@@ -63,13 +65,15 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		return ServerConfig{}, err
 	}
 
-	var readonlySet, enableRemoteSet bool
+	var readonlySet, enableRemoteSet, verboseSet bool
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "readonly":
 			readonlySet = true
 		case "enable-remote":
 			enableRemoteSet = true
+		case "verbose":
+			verboseSet = true
 		}
 	})
 	if !readonlySet {
@@ -85,6 +89,13 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 			return ServerConfig{}, err
 		}
 		*enableRemote = enableRemoteDefault
+	}
+	if !verboseSet {
+		verboseDefault, err := getenvBoolWith(lookupEnv, "GOMCR_VERBOSE", false)
+		if err != nil {
+			return ServerConfig{}, err
+		}
+		*verbose = verboseDefault
 	}
 
 	port, err := strconv.Atoi(*portStr)
@@ -137,6 +148,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		Listen:     *listen,
 		ReadOnly:     *readonly,
 		EnableRemote: *enableRemote,
+		Verbose:      *verbose,
 		Frame:      frame,
 		Transport:  transport,
 		QueueSize:  queueSize,
