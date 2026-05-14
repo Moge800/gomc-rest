@@ -8,6 +8,23 @@ import (
 	"testing"
 )
 
+func TestRecoverPanicReturns500(t *testing.T) {
+	orig := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	t.Cleanup(func() { slog.SetDefault(orig) })
+
+	handler := recoverPanic(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		panic("test panic")
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
 func TestLogRequestsStatusCode(t *testing.T) {
 	// Redirect slog to discard so test output stays clean.
 	orig := slog.Default()
