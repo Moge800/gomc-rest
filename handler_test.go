@@ -848,6 +848,28 @@ func TestWorkQueueRejectsBufferedDoAfterShutdown(t *testing.T) {
 	}
 }
 
+func TestHandleVersion(t *testing.T) {
+	orig := version
+	version = "v1.2.3"
+	t.Cleanup(func() { version = orig })
+
+	req := httptest.NewRequest(http.MethodGet, "/version", nil)
+	rec := httptest.NewRecorder()
+
+	handleVersion()(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["version"] != "v1.2.3" {
+		t.Fatalf("version = %v, want v1.2.3", body["version"])
+	}
+}
+
 func waitForWorkQueueClosed(t *testing.T, queue *WorkQueue) {
 	t.Helper()
 	deadline := time.After(time.Second)
