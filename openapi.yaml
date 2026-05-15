@@ -152,18 +152,13 @@ components:
       description: HTTP method not allowed for this endpoint
       headers:
         Allow:
-          description: The allowed HTTP method
+          description: The allowed HTTP methods for this endpoint (e.g. "GET, HEAD" or "POST")
           schema:
             type: string
-            example: "GET"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            status: 405
-            error: "GET required"
-            code: "bad_request"
 
 paths:
   /version:
