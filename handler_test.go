@@ -174,6 +174,20 @@ func assertReadOnlyError(t *testing.T, rec *httptest.ResponseRecorder) {
 	}
 }
 
+func assertRequiresGET(t *testing.T, handler http.Handler) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+	const wantAllow = "GET, HEAD"
+	if got := rec.Header().Get("Allow"); got != wantAllow {
+		t.Fatalf("Allow = %q, want %q", got, wantAllow)
+	}
+}
+
 func TestHandleReadRequiresGET(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/read?addr=D100", nil)
 	rec := httptest.NewRecorder()
@@ -183,8 +197,26 @@ func TestHandleReadRequiresGET(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 	}
-	if got := rec.Header().Get("Allow"); got != http.MethodGet {
-		t.Fatalf("Allow = %q, want %q", got, http.MethodGet)
+	if got := rec.Header().Get("Allow"); got != "GET, HEAD" {
+		t.Fatalf("Allow = %q, want %q", got, "GET, HEAD")
+	}
+}
+
+func TestInfoEndpointsRequireGET(t *testing.T) {
+	q := newTestPLCQueue(t)
+	cases := []struct {
+		name    string
+		handler http.Handler
+	}{
+		{"version", handleVersion()},
+		{"health", handleHealth(q)},
+		{"metrics", handleMetrics(q)},
+		{"openapi", handleOpenAPI(openAPISpec)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assertRequiresGET(t, tc.handler)
+		})
 	}
 }
 
@@ -920,6 +952,111 @@ func TestHandleMetrics(t *testing.T) {
 	if body["avg_latency_ms"] != float64(0) {
 		t.Errorf("avg_latency_ms = %v, want 0", body["avg_latency_ms"])
 	}
+}
+
+// newTestMux builds the same mux as main(), using a test PLCQueue.
+func newTestMux(t *testing.T) *http.ServeMux {
+	t.Helper()
+	q := newTestPLCQueue(t)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/openapi.yaml", handleOpenAPI(openAPISpec))
+	mux.HandleFunc("/version", handleVersion())
+	mux.HandleFunc("/metrics", handleMetrics(q))
+	mux.HandleFunc("/health", handleHealth(q))
+	mux.HandleFunc("/read", handleRead(q))
+	mux.HandleFunc("/write", handleWrite(q, false))
+	mux.HandleFunc("/remote/run", handleRemoteRun(q, false, true))
+	mux.HandleFunc("/remote/stop", handleRemoteStop(q, false, true))
+	mux.HandleFunc("/remote/pause", handleRemotePause(q, false, true))
+	mux.HandleFunc("/remote/latch-clear", handleRemoteLatchClear(q, false, true))
+	mux.HandleFunc("/remote/reset", handleRemoteReset(q, false, true))
+	return mux
+}
+
+// specPaths parses the paths section of openapi.yaml without an external YAML library.
+// It returns every line that starts with exactly two spaces followed by '/'.
+func specPaths() []string {
+	var paths []string
+	inPaths := false
+	for _, line := range strings.Split(string(openAPISpec), "\n") {
+		if line == "paths:" {
+			inPaths = true
+			continue
+		}
+		if inPaths {
+			// A top-level key under paths: exactly "  /something:"
+			if strings.HasPrefix(line, "  /") && strings.HasSuffix(strings.TrimSpace(line), ":") {
+				path := strings.TrimSuffix(strings.TrimSpace(line), ":")
+				paths = append(paths, path)
+			}
+			// Stop at the next top-level YAML key (no leading spaces)
+			if len(line) > 0 && line[0] != ' ' && line[0] != '\t' && line[0] != '#' {
+				break
+			}
+		}
+	}
+	return paths
+}
+
+// registeredRoutes lists every path registered in newTestMux / main.go.
+// Keep this in sync with both newTestMux above and main.go.
+var registeredRoutes = []string{
+	"/openapi.yaml",
+	"/version",
+	"/metrics",
+	"/health",
+	"/read",
+	"/write",
+	"/remote/run",
+	"/remote/stop",
+	"/remote/pause",
+	"/remote/latch-clear",
+	"/remote/reset",
+}
+
+// TestOpenAPISpecVsRoutes verifies that the OpenAPI spec and the registered
+// routes are consistent in both directions.
+//
+// ① Every path in openapi.yaml must respond with a non-404 status.
+// ② Every registered route must appear in openapi.yaml.
+func TestOpenAPISpecVsRoutes(t *testing.T) {
+	mux := newTestMux(t)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	paths := specPaths()
+	if len(paths) == 0 {
+		t.Fatal("specPaths returned no paths — check openapi.yaml parsing")
+	}
+
+	// ① spec → implementation: each spec path must not return 404
+	t.Run("spec_paths_exist", func(t *testing.T) {
+		client := &http.Client{Timeout: 5 * time.Second}
+		for _, path := range paths {
+			resp, err := client.Get(srv.URL + path)
+			if err != nil {
+				t.Errorf("%s: request error: %v", path, err)
+				continue
+			}
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusNotFound {
+				t.Errorf("%s: got 404 — path is in spec but not registered", path)
+			}
+		}
+	})
+
+	// ② implementation → spec: each registered route must appear in the spec
+	t.Run("routes_in_spec", func(t *testing.T) {
+		specSet := make(map[string]bool, len(paths))
+		for _, p := range paths {
+			specSet[p] = true
+		}
+		for _, route := range registeredRoutes {
+			if !specSet[route] {
+				t.Errorf("%s: route is registered but missing from openapi.yaml", route)
+			}
+		}
+	})
 }
 
 func waitForWorkQueueClosed(t *testing.T, queue *WorkQueue) {

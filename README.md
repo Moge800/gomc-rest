@@ -6,6 +6,8 @@
 
 The PLC transport is provided by [gomcprotocol](https://github.com/moge800/gomcprotocol). The server uses only the Go standard library for HTTP handling.
 
+A Python client library is available: [gomc-rest-client on PyPI](https://pypi.org/project/gomc-rest-client/)
+
 ## Features
 
 - Read word and bit devices through a simple `/read` endpoint.
@@ -95,9 +97,10 @@ All successful write and remote-control operations return:
 
 | Method | Path | Parameters / body | Response |
 | --- | --- | --- | --- |
-| `GET` recommended, not enforced | `/version` | none | `{"version":"v0.5.0"}` or `{"version":"dev"}` for local builds |
-| `GET` recommended, not enforced | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
-| `GET` recommended, not enforced | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
+| `GET` | `/openapi.yaml` | none | OpenAPI 3.1 specification (YAML) |
+| `GET` | `/version` | none | `{"version":"v0.5.0"}` or `{"version":"dev"}` for local builds |
+| `GET` | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
+| `GET` | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1`, `dword` optional and defaults to `false`, `sint` optional and defaults to `false` | `{"values":[100,200]}` or `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` required, `dword` optional and defaults to `false`, `sint` optional and defaults to `false`; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
 | `POST` | `/remote/run` | requires `-enable-remote`; query: `clear=0/1/2` optional, `force=true/false` optional | `{"ok":true}` |
@@ -116,8 +119,8 @@ Notes:
 - When `sint=true`, values are interpreted as signed integers. For word devices the range is `-32768..32767`; for `dword=true` the range is `-2147483648..2147483647`. Only word devices support `sint=true`. The PLC register bits are unchanged — `sint` only affects how values are converted between JSON and the 16-bit register representation.
 - `/remote/*` endpoints are disabled by default and return `403 forbidden` unless the server is started with `-enable-remote`. This is separate from read-only mode.
 - When read-only mode is enabled, POST operations on `/write` and `/remote/*` return `403 forbidden`. Read-only mode is a safety aid, not a replacement for network isolation, authentication, authorization, firewall rules, or PLC-side protection.
-- `force` is enabled only when the query value is exactly `true`.
-- `/health` always returns HTTP `200`, even when the PLC is disconnected.
+- Boolean query flags (`dword`, `sint`, `force`) are enabled only when the query string value is exactly `true`.
+- `GET /health` always returns HTTP `200`, even when the PLC is disconnected.
 - `/remote/reset` clears the TCP connection because the PLC closes it after reset.
 
 ## Device Addressing
