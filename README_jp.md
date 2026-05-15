@@ -6,6 +6,8 @@
 
 PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使用します。HTTP サーバー部分は Go の標準ライブラリのみで実装されています。
 
+Python クライアントライブラリもあります: [gomc-rest-client (PyPI)](https://pypi.org/project/gomc-rest-client/)
+
 ## 機能
 
 - `/read` でワードデバイスとビットデバイスを読み取り。

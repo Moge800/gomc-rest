@@ -6,6 +6,8 @@
 
 The PLC transport is provided by [gomcprotocol](https://github.com/moge800/gomcprotocol). The server uses only the Go standard library for HTTP handling.
 
+A Python client library is available: [gomc-rest-client on PyPI](https://pypi.org/project/gomc-rest-client/)
+
 ## Features
 
 - Read word and bit devices through a simple `/read` endpoint.
