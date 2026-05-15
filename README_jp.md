@@ -98,9 +98,9 @@ go build -o gomc-rest .
 | Method | Path | パラメータ / body | レスポンス |
 | --- | --- | --- | --- |
 | `GET` | `/openapi.yaml` | なし | OpenAPI 3.1 仕様書（YAML） |
-| `GET` 推奨、未強制 | `/version` | なし | `{"version":"v0.5.0"}` またはローカルビルドでは `{"version":"dev"}` |
-| `GET` 推奨、未強制 | `/metrics` | なし | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
-| `GET` 推奨、未強制 | `/health` | なし | `{"plc_status":"ok","connected":true}` または `{"plc_status":"disconnected","connected":false}` |
+| `GET` | `/version` | なし | `{"version":"v0.5.0"}` またはローカルビルドでは `{"version":"dev"}` |
+| `GET` | `/metrics` | なし | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
+| `GET` | `/health` | なし | `{"plc_status":"ok","connected":true}` または `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1`、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false` | `{"values":[100,200]}` または `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` 必須、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false`、body: `{"values":[1,2,3]}` または `{"values":[true,false]}` | `{"ok":true}` |
 | `POST` | `/remote/run` | `-enable-remote` が必要。query: `clear=0/1/2` 任意、`force=true/false` 任意 | `{"ok":true}` |

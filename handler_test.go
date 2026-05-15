@@ -174,6 +174,19 @@ func assertReadOnlyError(t *testing.T, rec *httptest.ResponseRecorder) {
 	}
 }
 
+func assertRequiresGET(t *testing.T, handler http.Handler) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+	if got := rec.Header().Get("Allow"); got != http.MethodGet {
+		t.Fatalf("Allow = %q, want %q", got, http.MethodGet)
+	}
+}
+
 func TestHandleReadRequiresGET(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/read?addr=D100", nil)
 	rec := httptest.NewRecorder()
@@ -185,6 +198,24 @@ func TestHandleReadRequiresGET(t *testing.T) {
 	}
 	if got := rec.Header().Get("Allow"); got != http.MethodGet {
 		t.Fatalf("Allow = %q, want %q", got, http.MethodGet)
+	}
+}
+
+func TestInfoEndpointsRequireGET(t *testing.T) {
+	q := newTestPLCQueue(t)
+	cases := []struct {
+		name    string
+		handler http.Handler
+	}{
+		{"version", handleVersion()},
+		{"health", handleHealth(q)},
+		{"metrics", handleMetrics(q)},
+		{"openapi", handleOpenAPI(openAPISpec)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assertRequiresGET(t, tc.handler)
+		})
 	}
 }
 
