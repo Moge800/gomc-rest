@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"flag"
 	"fmt"
@@ -14,6 +15,9 @@ import (
 	"syscall"
 	"time"
 )
+
+//go:embed openapi.yaml
+var openAPISpec []byte
 
 func main() {
 	cfg, err := parseConfig(os.Args[1:], os.Getenv, os.Stderr)
@@ -46,6 +50,7 @@ func main() {
 	plcQueue.InitialConnect()
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/openapi.yaml", handleOpenAPI(openAPISpec))
 	mux.HandleFunc("/version", handleVersion())
 	mux.HandleFunc("/metrics", handleMetrics(plcQueue))
 	mux.HandleFunc("/health", handleHealth(plcQueue))

@@ -83,6 +83,15 @@ func writePLCErr(w http.ResponseWriter, err error) {
 	}
 }
 
+// GET /openapi.yaml
+func handleOpenAPI(spec []byte) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(spec)
+	}
+}
+
 // GET /metrics
 func handleMetrics(plc *PLCQueue) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
