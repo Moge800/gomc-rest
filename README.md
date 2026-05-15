@@ -95,6 +95,7 @@ All successful write and remote-control operations return:
 
 | Method | Path | Parameters / body | Response |
 | --- | --- | --- | --- |
+| `GET` recommended, not enforced | `/openapi.yaml` | none | OpenAPI 3.1 specification (YAML) |
 | `GET` recommended, not enforced | `/version` | none | `{"version":"v0.5.0"}` or `{"version":"dev"}` for local builds |
 | `GET` recommended, not enforced | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
 | `GET` recommended, not enforced | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
