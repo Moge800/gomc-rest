@@ -119,8 +119,8 @@ Notes:
 - When `sint=true`, values are interpreted as signed integers. For word devices the range is `-32768..32767`; for `dword=true` the range is `-2147483648..2147483647`. Only word devices support `sint=true`. The PLC register bits are unchanged — `sint` only affects how values are converted between JSON and the 16-bit register representation.
 - `/remote/*` endpoints are disabled by default and return `403 forbidden` unless the server is started with `-enable-remote`. This is separate from read-only mode.
 - When read-only mode is enabled, POST operations on `/write` and `/remote/*` return `403 forbidden`. Read-only mode is a safety aid, not a replacement for network isolation, authentication, authorization, firewall rules, or PLC-side protection.
-- `force` is enabled only when the query value is exactly `true`.
-- `/health` always returns HTTP `200`, even when the PLC is disconnected.
+- Boolean query flags (`dword`, `sint`, `force`) are enabled only when the query string value is exactly `true`.
+- `GET /health` always returns HTTP `200`, even when the PLC is disconnected.
 - `/remote/reset` clears the TCP connection because the PLC closes it after reset.
 
 ## Device Addressing
