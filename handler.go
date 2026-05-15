@@ -97,21 +97,30 @@ func handleOpenAPI(spec []byte) http.HandlerFunc {
 
 // GET /metrics
 func handleMetrics(plc *PLCQueue) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		writeJSON(w, http.StatusOK, plc.Metrics())
 	}
 }
 
 // GET /version
 func handleVersion() http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"version": version})
 	}
 }
 
 // GET /health
 func handleHealth(plc *PLCQueue) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		connected := plc.IsConnected()
 
 		plcStatus := "ok"

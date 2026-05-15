@@ -181,6 +181,8 @@ paths:
                   version:
                     type: string
                     example: "v0.5.0"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
 
   /health:
     get:
@@ -203,6 +205,8 @@ paths:
                   connected:
                     type: boolean
                     example: true
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
 
   /metrics:
     get:
@@ -244,6 +248,8 @@ paths:
                     type: integer
                     description: Current number of pending operations in the queue
                     example: 0
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
 
   /read:
     get:
@@ -303,6 +309,7 @@ paths:
                       - type: array
                         items:
                           type: integer
+                          format: int64
                         description: Word device values
                       - type: array
                         items:
@@ -385,6 +392,7 @@ paths:
                     - type: array
                       items:
                         type: integer
+                        format: int64
                       description: Word or dword values
                     - type: array
                       items:
