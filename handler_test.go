@@ -182,8 +182,9 @@ func assertRequiresGET(t *testing.T, handler http.Handler) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 	}
-	if got := rec.Header().Get("Allow"); got != http.MethodGet {
-		t.Fatalf("Allow = %q, want %q", got, http.MethodGet)
+	const wantAllow = "GET, HEAD"
+	if got := rec.Header().Get("Allow"); got != wantAllow {
+		t.Fatalf("Allow = %q, want %q", got, wantAllow)
 	}
 }
 
@@ -196,8 +197,8 @@ func TestHandleReadRequiresGET(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 	}
-	if got := rec.Header().Get("Allow"); got != http.MethodGet {
-		t.Fatalf("Allow = %q, want %q", got, http.MethodGet)
+	if got := rec.Header().Get("Allow"); got != "GET, HEAD" {
+		t.Fatalf("Allow = %q, want %q", got, "GET, HEAD")
 	}
 }
 

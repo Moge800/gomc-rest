@@ -37,7 +37,11 @@ func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 	if method == http.MethodGet && r.Method == http.MethodHead {
 		return true
 	}
-	w.Header().Set("Allow", method)
+	allow := method
+	if method == http.MethodGet {
+		allow = "GET, HEAD"
+	}
+	w.Header().Set("Allow", allow)
 	writeErr(w, http.StatusMethodNotAllowed, "bad_request", method+" required")
 	return false
 }
