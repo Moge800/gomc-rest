@@ -52,7 +52,7 @@ components:
 
   responses:
     BadRequest:
-      description: Bad request (invalid parameter or method)
+      description: Bad request (invalid or missing parameter)
       content:
         application/json:
           schema:
@@ -85,7 +85,9 @@ components:
             code: "request_canceled"
 
     PLCError:
-      description: PLC returned a protocol-level error
+      description: >
+        PLC error. `end_code` is present when the PLC returned a protocol-level
+        error code; absent for unclassified gateway errors.
       content:
         application/json:
           schema:
@@ -111,7 +113,7 @@ components:
             busy:
               value:
                 status: 503
-                error: "PLC queue is full"
+                error: "PLC communication queue is full"
                 code: "busy"
             connection_error:
               value:
@@ -121,7 +123,7 @@ components:
             queue_closed:
               value:
                 status: 503
-                error: "queue is closed"
+                error: "PLC communication queue is closed"
                 code: "queue_closed"
 
     RequestTimeout:
@@ -284,7 +286,7 @@ paths:
         - name: dword
           in: query
           required: false
-          description: Read 32-bit double words (word devices only; reads count×2 registers)
+          description: "Read 32-bit double words (word devices only; reads count×2 registers; unsigned by default, signed with `sint=true`)"
           schema:
             type: boolean
             default: false
@@ -368,7 +370,7 @@ paths:
         - name: dword
           in: query
           required: false
-          description: Write 32-bit double words (word devices only)
+          description: "Write 32-bit double words (word devices only; unsigned by default, signed with `sint=true`)"
           schema:
             type: boolean
             default: false
