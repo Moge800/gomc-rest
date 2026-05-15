@@ -33,6 +33,10 @@ func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 	if r.Method == method {
 		return true
 	}
+	// RFC 9110: servers that support GET must also support HEAD.
+	if method == http.MethodGet && r.Method == http.MethodHead {
+		return true
+	}
 	w.Header().Set("Allow", method)
 	writeErr(w, http.StatusMethodNotAllowed, "bad_request", method+" required")
 	return false
