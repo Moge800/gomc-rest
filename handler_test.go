@@ -999,8 +999,9 @@ func TestOpenAPISpecVsRoutes(t *testing.T) {
 
 	// ① spec → implementation: each spec path must not return 404
 	t.Run("spec_paths_exist", func(t *testing.T) {
+		client := &http.Client{Timeout: 5 * time.Second}
 		for _, path := range paths {
-			resp, err := http.Get(srv.URL + path)
+			resp, err := client.Get(srv.URL + path)
 			if err != nil {
 				t.Errorf("%s: request error: %v", path, err)
 				continue

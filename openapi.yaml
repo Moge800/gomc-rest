@@ -135,6 +135,17 @@ components:
             error: "request timed out"
             code: "request_timeout"
 
+    RequestEntityTooLarge:
+      description: Request body exceeds the 1 MiB limit
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            status: 413
+            error: "body must not be larger than 1048576 bytes"
+            code: "bad_request"
+
     MethodNotAllowed:
       description: HTTP method not allowed for this endpoint
       headers:
@@ -408,7 +419,7 @@ paths:
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
         "413":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/RequestEntityTooLarge"
         "499":
           $ref: "#/components/responses/RequestCanceled"
         "502":
