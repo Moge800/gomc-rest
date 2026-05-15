@@ -85,7 +85,10 @@ func writePLCErr(w http.ResponseWriter, err error) {
 
 // GET /openapi.yaml
 func handleOpenAPI(spec []byte) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(spec)

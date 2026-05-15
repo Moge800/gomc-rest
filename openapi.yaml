@@ -26,7 +26,7 @@ components:
 
     PLCErrorResponse:
       type: object
-      required: [status, error, code, end_code]
+      required: [status, error, code]
       properties:
         status:
           type: integer
@@ -39,6 +39,7 @@ components:
           enum: [plc_error]
         end_code:
           type: string
+          description: PLC end code; present only when the PLC returns a protocol-level error code
           example: "0x4000"
 
     OkResponse:
@@ -133,6 +134,23 @@ components:
             status: 504
             error: "request timed out"
             code: "request_timeout"
+
+    MethodNotAllowed:
+      description: HTTP method not allowed for this endpoint
+      headers:
+        Allow:
+          description: The allowed HTTP method
+          schema:
+            type: string
+            example: "GET"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            status: 405
+            error: "GET required"
+            code: "bad_request"
 
 paths:
   /version:
@@ -294,6 +312,8 @@ paths:
                     values: [100000, 200000]
         "400":
           $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "499":
           $ref: "#/components/responses/RequestCanceled"
         "502":
@@ -314,6 +334,8 @@ paths:
         With `sint=true`: `values` is `list[int]` (−32768–32767).
 
         **Bit devices**: body `values` must be `list[bool]`.
+
+        Maximum items in `values`: 1024 for word/bit writes, 512 when `dword=true` (each value occupies two registers).
 
         Requires server not started with `-readonly`.
       operationId: writeDevice
@@ -383,6 +405,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "413":
           $ref: "#/components/responses/BadRequest"
         "499":
@@ -428,6 +452,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "499":
           $ref: "#/components/responses/RequestCanceled"
         "502":
@@ -455,6 +481,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "499":
           $ref: "#/components/responses/RequestCanceled"
         "502":
@@ -490,6 +518,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "499":
           $ref: "#/components/responses/RequestCanceled"
         "502":
@@ -517,6 +547,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "499":
           $ref: "#/components/responses/RequestCanceled"
         "502":
@@ -544,6 +576,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "499":
           $ref: "#/components/responses/RequestCanceled"
         "502":
@@ -565,3 +599,5 @@ paths:
             application/yaml:
               schema:
                 type: string
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
