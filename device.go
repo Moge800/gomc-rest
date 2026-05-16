@@ -24,7 +24,7 @@ var wordDevs = map[string]bool{
 	"TN": true, "STN": true, "CN": true, "Z": true, "SW": true, "SD": true,
 }
 
-// multiCharPrefixes: longest first to avoid partial matches (e.g. "ST" before "S")
+// multiCharPrefixes: longest first to avoid partial matches (e.g. "STC" before "S")
 var multiCharPrefixes = []string{
 	"STC", "STS", "STN",
 	"ZR", "SB", "SW", "SM", "SD", "TN", "CN", "TC", "TS", "CC", "CS", "DX", "DY",
@@ -40,7 +40,7 @@ func parseAddr(s string) (mc.DeviceAddr, error) {
 	var rest string
 
 	for _, p := range multiCharPrefixes {
-		if strings.HasPrefix(s, p) && len(s) > len(p) {
+		if strings.HasPrefix(s, p) {
 			dev = p
 			rest = s[len(p):]
 			break

@@ -55,9 +55,24 @@ func TestParseAddr(t *testing.T) {
 	ng := []string{
 		"",       // 短すぎ
 		"D",      // 番号なし
+		"TN",     // 番号なし（2文字プレフィックス）
+		"STC",    // 番号なし（3文字プレフィックス）
 		"Q100",   // 不明デバイス
 		"Dabc",   // 番号が非数値
 		"D-1",    // 負数
+	}
+
+	wordDevCases := []struct {
+		dev  string
+		want bool
+	}{
+		{"D", true}, {"TN", true}, {"STN", true}, {"CN", true},
+		{"TC", false}, {"CC", false}, {"M", false}, {"X", false},
+	}
+	for _, tc := range wordDevCases {
+		if got := isWordDevice(tc.dev); got != tc.want {
+			t.Errorf("isWordDevice(%q) = %v, want %v", tc.dev, got, tc.want)
+		}
 	}
 
 	for _, in := range ng {
