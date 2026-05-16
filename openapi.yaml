@@ -258,7 +258,7 @@ paths:
         With `dword=true` reads pairs of registers as 32-bit unsigned integers.
         With `sint=true` interprets values as signed (16-bit or 32-bit).
 
-        **Bit devices** (M, X, Y, B, T, C, …): returns `list[bool]`. `dword` and `sint` are not supported.
+        **Bit devices** (M, X, Y, B, TC, CC, …): returns `list[bool]`. `dword` and `sint` are not supported.
       operationId: readDevice
       parameters:
         - name: addr
