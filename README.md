@@ -216,7 +216,7 @@ Device addresses are case-insensitive and may include surrounding whitespace. Th
 | Type | Devices | JSON value type | Examples |
 | --- | --- | --- | --- |
 | Word | `D`, `W`, `R`, `ZR`, `TN`, `CN`, `Z`, `SW`, `SD` | integer | `D100`, `ZR512`, `SW5` |
-| Bit | `X`, `Y`, `M`, `L`, `B`, `F`, `SB`, `SM` | boolean | `M0`, `X10`, `SB10` |
+| Bit | `X`, `Y`, `M`, `L`, `B`, `F`, `SB`, `SM`, `T`, `C` | boolean | `M0`, `X10`, `T10`, `C5` |
 
 The numeric address must be a non-negative integer. Unknown devices, missing numbers, non-numeric numbers, and negative numbers return `400 bad_request`.
 

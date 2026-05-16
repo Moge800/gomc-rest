@@ -25,6 +25,8 @@ func TestParseAddr(t *testing.T) {
 		{"SD200", mc.DeviceAddr{Device: "SD", Addr: 200}},
 		{"TN10", mc.DeviceAddr{Device: "TN", Addr: 10}},
 		{"CN5", mc.DeviceAddr{Device: "CN", Addr: 5}},
+		{"T10", mc.DeviceAddr{Device: "T", Addr: 10}},
+		{"C5", mc.DeviceAddr{Device: "C", Addr: 5}},
 		// 小文字・空白
 		{"d100", mc.DeviceAddr{Device: "D", Addr: 100}},
 		{" M10 ", mc.DeviceAddr{Device: "M", Addr: 10}},

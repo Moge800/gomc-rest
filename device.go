@@ -13,6 +13,7 @@ var validDevs = map[string]bool{
 	"X": true, "Y": true, "M": true, "L": true,
 	"B": true, "F": true, "SB": true, "SW": true,
 	"SM": true, "SD": true, "TN": true, "CN": true, "Z": true,
+	"T": true, "C": true,
 }
 
 var wordDevs = map[string]bool{
