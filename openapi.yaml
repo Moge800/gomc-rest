@@ -350,6 +350,7 @@ paths:
         With `sint=true`: `values` is `list[int]` (−32768–32767).
 
         **Bit devices**: body `values` must be `list[bool]`.
+        Timer/counter contacts use two-letter prefixes: `TC`, `TS`, `CC`, `CS`. Single-letter `T` and `C` are not valid.
 
         Maximum items in `values`: 1024 for word/bit writes, 512 when `dword=true` (each value occupies two registers).
 
