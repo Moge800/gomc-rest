@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -24,11 +25,20 @@ var wordDevs = map[string]bool{
 	"TN": true, "STN": true, "CN": true, "Z": true, "SW": true, "SD": true,
 }
 
-// multiCharPrefixes: longest first to avoid partial matches (e.g. "STC" before "S")
-var multiCharPrefixes = []string{
-	"STC", "STS", "STN",
-	"ZR", "SB", "SW", "SM", "SD", "TN", "CN", "TC", "TS", "CC", "CS", "DX", "DY",
-}
+// multiCharPrefixes holds all device names longer than one character, sorted
+// longest-first so that e.g. "STC" is matched before "S".
+var multiCharPrefixes = func() []string {
+	var ps []string
+	for dev := range validDevs {
+		if len(dev) > 1 {
+			ps = append(ps, dev)
+		}
+	}
+	sort.Slice(ps, func(i, j int) bool {
+		return len(ps[i]) > len(ps[j])
+	})
+	return ps
+}()
 
 func parseAddr(s string) (mc.DeviceAddr, error) {
 	s = strings.ToUpper(strings.TrimSpace(s))

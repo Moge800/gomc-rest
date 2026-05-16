@@ -218,7 +218,7 @@ Device addresses are case-insensitive and may include surrounding whitespace. Th
 | Word | `D`, `W`, `R`, `ZR`, `TN`, `STN`, `CN`, `Z`, `SW`, `SD` | integer | `D100`, `ZR512`, `TN10`, `CN5` |
 | Bit | `X`, `Y`, `M`, `L`, `B`, `F`, `V`, `SB`, `SM`, `S`, `DX`, `DY`, `TC`, `TS`, `STC`, `STS`, `CC`, `CS` | boolean | `M0`, `TC10`, `CC5`, `STC3` |
 
-Timer and counter contacts use the two-letter prefixes `TC` (timer contact), `TS` (timer coil), `CC` (counter contact), and `CS` (counter coil). The single-letter forms `T` and `C` are not valid device names and return `400 bad_request`.
+Timer and counter contacts and coils use two-letter prefixes: `TC` (timer contact), `TS` (timer coil), `CC` (counter contact), `CS` (counter coil). The single-letter forms `T` and `C` are not valid device names and return `400 bad_request`.
 
 The numeric address must be a non-negative integer. Unknown devices, missing numbers, non-numeric numbers, and negative numbers return `400 bad_request`.
 
