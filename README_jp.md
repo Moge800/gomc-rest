@@ -58,7 +58,7 @@ gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT%
 pause
 ```
 
-バッチファイルをダブルクリックするとサーバーが起動します。`pause` の行でウィンドウが開いたままになりログを確認できます。ウィンドウを閉じるか、任意のキーを押すと停止します。
+バッチファイルをダブルクリックするとサーバーが起動します。停止するには **Ctrl+C** を押すかウィンドウを閉じてください。`pause` はサーバー終了後にウィンドウを開いたままにしてエラーメッセージを確認できるようにするためのものです。
 
 ### 2. 起動確認
 
@@ -74,7 +74,7 @@ http://localhost:8080/health
 {"plc_status":"ok","connected":true}
 ```
 
-PLC に未接続の場合は `connected` が `false` になります。サーバーは起動を続け、最初のリクエスト時に再接続を試みます。
+PLC に未接続の場合は `connected` が `false` になります。サーバーは起動を続け、最初の PLC 操作（`/read`・`/write`・`/remote/*`）時に再接続を試みます。
 
 ### 読み取り専用モード
 
@@ -97,13 +97,13 @@ pause
 set PLC_HOST=192.168.0.1
 set PLC_PORT=5007
 set LISTEN_PORT=8080
-set LOG_FILE=C:\logs\gomc-rest.log
+set LOG_FILE=C:\gomc-rest.log
 
 gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT% -log-file %LOG_FILE%
 pause
 ```
 
-ログはコンソールとファイルの両方に出力されます。
+ログはコンソールとファイルの両方に出力されます。ディレクトリが存在しない場合はサーバーが起動できないため、事前に作成しておく必要があります。
 
 ### リモート操作を有効にする
 

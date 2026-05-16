@@ -58,7 +58,7 @@ gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT%
 pause
 ```
 
-Double-click the batch file to start the server. The `pause` line keeps the window open so you can see log output. Press any key or close the window to stop.
+Double-click the batch file to start the server. To stop it, press **Ctrl+C** or close the window. The `pause` line keeps the window open after the server exits so you can read any error messages.
 
 ### 2. Verify the server is running
 
@@ -74,7 +74,7 @@ You should see:
 {"plc_status":"ok","connected":true}
 ```
 
-If the PLC is not reachable yet, `connected` will be `false`. The server still starts and will retry the connection on the first request.
+If the PLC is not reachable yet, `connected` will be `false`. The server still starts and will retry the connection on the first PLC operation (`/read`, `/write`, or `/remote/*`).
 
 ### Read-only mode
 
@@ -97,13 +97,13 @@ pause
 set PLC_HOST=192.168.0.1
 set PLC_PORT=5007
 set LISTEN_PORT=8080
-set LOG_FILE=C:\logs\gomc-rest.log
+set LOG_FILE=C:\gomc-rest.log
 
 gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT% -log-file %LOG_FILE%
 pause
 ```
 
-Logs are written to both the console and the file.
+Logs are written to both the console and the file. The directory must already exist; the server does not create missing parent directories.
 
 ### Enable remote control
 
