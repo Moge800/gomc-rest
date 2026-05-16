@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -9,19 +10,35 @@ import (
 )
 
 var validDevs = map[string]bool{
+	// word
 	"D": true, "W": true, "R": true, "ZR": true,
-	"X": true, "Y": true, "M": true, "L": true,
-	"B": true, "F": true, "SB": true, "SW": true,
-	"SM": true, "SD": true, "TN": true, "CN": true, "Z": true,
+	"TN": true, "STN": true, "CN": true, "Z": true, "SW": true, "SD": true,
+	// bit
+	"X": true, "Y": true, "M": true, "L": true, "B": true, "F": true, "V": true,
+	"SB": true, "SM": true, "S": true, "DX": true, "DY": true,
+	"TC": true, "TS": true, "STC": true, "STS": true,
+	"CC": true, "CS": true,
 }
 
 var wordDevs = map[string]bool{
 	"D": true, "W": true, "R": true, "ZR": true,
-	"TN": true, "CN": true, "Z": true, "SW": true, "SD": true,
+	"TN": true, "STN": true, "CN": true, "Z": true, "SW": true, "SD": true,
 }
 
-// two-char prefixes tried before single-char
-var twoCharPrefixes = []string{"ZR", "SB", "SW", "SM", "SD", "TN", "CN"}
+// multiCharPrefixes holds all device names longer than one character, sorted
+// longest-first so that e.g. "STC" is matched before "S".
+var multiCharPrefixes = func() []string {
+	var ps []string
+	for dev := range validDevs {
+		if len(dev) > 1 {
+			ps = append(ps, dev)
+		}
+	}
+	sort.Slice(ps, func(i, j int) bool {
+		return len(ps[i]) > len(ps[j])
+	})
+	return ps
+}()
 
 func parseAddr(s string) (mc.DeviceAddr, error) {
 	s = strings.ToUpper(strings.TrimSpace(s))
@@ -32,8 +49,8 @@ func parseAddr(s string) (mc.DeviceAddr, error) {
 	var dev string
 	var rest string
 
-	for _, p := range twoCharPrefixes {
-		if strings.HasPrefix(s, p) && len(s) > len(p) {
+	for _, p := range multiCharPrefixes {
+		if strings.HasPrefix(s, p) {
 			dev = p
 			rest = s[len(p):]
 			break

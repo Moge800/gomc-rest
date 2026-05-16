@@ -25,6 +25,17 @@ func TestParseAddr(t *testing.T) {
 		{"SD200", mc.DeviceAddr{Device: "SD", Addr: 200}},
 		{"TN10", mc.DeviceAddr{Device: "TN", Addr: 10}},
 		{"CN5", mc.DeviceAddr{Device: "CN", Addr: 5}},
+		{"TC10", mc.DeviceAddr{Device: "TC", Addr: 10}},
+		{"TS10", mc.DeviceAddr{Device: "TS", Addr: 10}},
+		{"CC5", mc.DeviceAddr{Device: "CC", Addr: 5}},
+		{"CS5", mc.DeviceAddr{Device: "CS", Addr: 5}},
+		{"STN3", mc.DeviceAddr{Device: "STN", Addr: 3}},
+		{"STC3", mc.DeviceAddr{Device: "STC", Addr: 3}},
+		{"STS3", mc.DeviceAddr{Device: "STS", Addr: 3}},
+		{"DX0", mc.DeviceAddr{Device: "DX", Addr: 0}},
+		{"DY0", mc.DeviceAddr{Device: "DY", Addr: 0}},
+		{"S10", mc.DeviceAddr{Device: "S", Addr: 10}},
+		{"V5", mc.DeviceAddr{Device: "V", Addr: 5}},
 		// 小文字・空白
 		{"d100", mc.DeviceAddr{Device: "D", Addr: 100}},
 		{" M10 ", mc.DeviceAddr{Device: "M", Addr: 10}},
@@ -44,9 +55,26 @@ func TestParseAddr(t *testing.T) {
 	ng := []string{
 		"",       // 短すぎ
 		"D",      // 番号なし
+		"TN",     // 番号なし（2文字プレフィックス）
+		"STC",    // 番号なし（3文字プレフィックス）
 		"Q100",   // 不明デバイス
+		"T10",    // 単一文字 T は無効（TC を使う）
+		"C5",     // 単一文字 C は無効（CC を使う）
 		"Dabc",   // 番号が非数値
 		"D-1",    // 負数
+	}
+
+	wordDevCases := []struct {
+		dev  string
+		want bool
+	}{
+		{"D", true}, {"TN", true}, {"STN", true}, {"CN", true},
+		{"TC", false}, {"CC", false}, {"M", false}, {"X", false},
+	}
+	for _, tc := range wordDevCases {
+		if got := isWordDevice(tc.dev); got != tc.want {
+			t.Errorf("isWordDevice(%q) = %v, want %v", tc.dev, got, tc.want)
+		}
 	}
 
 	for _, in := range ng {
