@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"time"
 
 	mc "github.com/moge800/gomcprotocol"
@@ -145,7 +146,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		Port:       port,
 		Mode:       mode,
 		ModeString: *modeStr,
-		Listen:     *listen,
+		Listen:     normalizeListen(*listen),
 		ReadOnly:     *readonly,
 		EnableRemote: *enableRemote,
 		Verbose:      *verbose,
@@ -174,4 +175,12 @@ func getenvBoolWith(lookupEnv func(string) string, key string, fallback bool) (b
 		return fallback, fmt.Errorf("invalid %s %q: must be a boolean (true/false or 1/0)", key, v)
 	}
 	return b, nil
+}
+
+// normalizeListen prepends ":" to a bare port number so both "8080" and ":8080" work.
+func normalizeListen(s string) string {
+	if !strings.Contains(s, ":") {
+		return ":" + s
+	}
+	return s
 }
