@@ -53,6 +53,30 @@ func TestParseConfigDefaultsAndNewFlags(t *testing.T) {
 	}
 }
 
+func TestNormalizeListen(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"8080", ":8080"},
+		{":8080", ":8080"},
+		{"127.0.0.1:8080", "127.0.0.1:8080"},
+		{"0.0.0.0:9000", "0.0.0.0:9000"},
+	}
+	for _, tc := range cases {
+		if got := normalizeListen(tc.in); got != tc.want {
+			t.Errorf("normalizeListen(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestParseConfigListenNormalized(t *testing.T) {
+	cfg, err := parseConfig([]string{"-listen", "9090"}, emptyEnv, nil)
+	if err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	if cfg.Listen != ":9090" {
+		t.Fatalf("Listen = %q, want %q", cfg.Listen, ":9090")
+	}
+}
+
 func TestParseConfigRejectsInvalidQueueSize(t *testing.T) {
 	_, err := parseConfig([]string{"-queue-size", "0"}, emptyEnv, nil)
 	if err == nil || !strings.Contains(err.Error(), "invalid queue-size") {
