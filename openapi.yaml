@@ -259,6 +259,7 @@ paths:
         With `sint=true` interprets values as signed (16-bit or 32-bit).
 
         **Bit devices** (M, X, Y, B, TC, CC, …): returns `list[bool]`. `dword` and `sint` are not supported.
+        Timer/counter contacts use two-letter prefixes: `TC`, `TS`, `CC`, `CS`. Single-letter `T` and `C` are not valid.
       operationId: readDevice
       parameters:
         - name: addr
