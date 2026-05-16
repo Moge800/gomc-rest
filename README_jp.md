@@ -38,6 +38,92 @@ Python クライアントライブラリもあります: [gomc-rest-client (PyPI
 
 公開リリースでは Windows 用バイナリ名を `gomc-rest.exe` としています。ソースからビルドする場合は、下記のビルドコマンドで指定した出力名になります。
 
+## クイックスタート（Windows）
+
+### 1. バッチファイルを作成する
+
+`gomc-rest.exe` と同じフォルダに `start-gomc-rest.bat` を作成し、先頭の設定値をご使用の環境に合わせて書き換えてください。
+
+```bat
+@echo off
+REM ============================================================
+REM  環境に合わせてここを書き換えてください
+REM ============================================================
+set PLC_HOST=192.168.0.1
+set PLC_PORT=5007
+set LISTEN_PORT=8080
+REM ============================================================
+
+gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT%
+pause
+```
+
+バッチファイルをダブルクリックするとサーバーが起動します。`pause` の行でウィンドウが開いたままになりログを確認できます。ウィンドウを閉じるか、任意のキーを押すと停止します。
+
+### 2. 起動確認
+
+ブラウザで以下を開いてください。
+
+```
+http://localhost:8080/health
+```
+
+以下のように返ってくれば正常に起動しています。
+
+```json
+{"plc_status":"ok","connected":true}
+```
+
+PLC に未接続の場合は `connected` が `false` になります。サーバーは起動を続け、最初のリクエスト時に再接続を試みます。
+
+### 読み取り専用モード
+
+書き込みおよびリモート操作をすべてブロックする場合（モニタリングのみ）:
+
+```bat
+@echo off
+set PLC_HOST=192.168.0.1
+set PLC_PORT=5007
+set LISTEN_PORT=8080
+
+gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT% -readonly
+pause
+```
+
+### ログをファイルに保存する
+
+```bat
+@echo off
+set PLC_HOST=192.168.0.1
+set PLC_PORT=5007
+set LISTEN_PORT=8080
+set LOG_FILE=C:\logs\gomc-rest.log
+
+gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT% -log-file %LOG_FILE%
+pause
+```
+
+ログはコンソールとファイルの両方に出力されます。
+
+### リモート操作を有効にする
+
+リモート操作エンドポイント（`/remote/run`・`/remote/stop` など）はデフォルトで無効です。`-enable-remote` を追加して有効にします。
+
+```bat
+gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT% -enable-remote
+```
+
+## トラブルシューティング
+
+| 症状 | 考えられる原因 | 対処 |
+| --- | --- | --- |
+| `/health` で `{"connected":false}` | PLC が停止しているか IP/ポートが違う | バッチファイルの `PLC_HOST` と `PLC_PORT` を確認 |
+| `/write` で `403 forbidden` | `-readonly` で起動している | バッチファイルから `-readonly` を削除 |
+| `/remote/*` で `403 forbidden` | `-enable-remote` が設定されていない | バッチファイルに `-enable-remote` を追加 |
+| `503 busy` | 同時リクエストが多すぎる | `-queue-size` を増やす（デフォルト: 32） |
+| ポートが使用中 | 他のプロセスがポートを使用している | `LISTEN_PORT` を空いているポート番号に変更 |
+| ウィンドウがすぐ閉じる | 起動エラー | コマンドプロンプトから実行してエラーを確認 |
+
 ## 実行
 
 Windows 用リリースバイナリの場合:

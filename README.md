@@ -38,6 +38,92 @@ Download the latest `gomc-rest.exe` from the [Releases](https://github.com/moge8
 
 Published releases provide the Windows binary as `gomc-rest.exe`. Source builds use the output name from the build command below.
 
+## Quick Start (Windows)
+
+### 1. Create a batch file
+
+Create `start-gomc-rest.bat` in the same folder as `gomc-rest.exe` and edit the values at the top to match your environment:
+
+```bat
+@echo off
+REM ============================================================
+REM  Edit these values to match your environment
+REM ============================================================
+set PLC_HOST=192.168.0.1
+set PLC_PORT=5007
+set LISTEN_PORT=8080
+REM ============================================================
+
+gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT%
+pause
+```
+
+Double-click the batch file to start the server. The `pause` line keeps the window open so you can see log output. Press any key or close the window to stop.
+
+### 2. Verify the server is running
+
+Open a browser and go to:
+
+```
+http://localhost:8080/health
+```
+
+You should see:
+
+```json
+{"plc_status":"ok","connected":true}
+```
+
+If the PLC is not reachable yet, `connected` will be `false`. The server still starts and will retry the connection on the first request.
+
+### Read-only mode
+
+To block all write and remote-control operations (for monitoring only):
+
+```bat
+@echo off
+set PLC_HOST=192.168.0.1
+set PLC_PORT=5007
+set LISTEN_PORT=8080
+
+gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT% -readonly
+pause
+```
+
+### Save logs to a file
+
+```bat
+@echo off
+set PLC_HOST=192.168.0.1
+set PLC_PORT=5007
+set LISTEN_PORT=8080
+set LOG_FILE=C:\logs\gomc-rest.log
+
+gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT% -log-file %LOG_FILE%
+pause
+```
+
+Logs are written to both the console and the file.
+
+### Enable remote control
+
+Remote-control endpoints (`/remote/run`, `/remote/stop`, etc.) are disabled by default. Add `-enable-remote` to turn them on:
+
+```bat
+gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT% -listen %LISTEN_PORT% -enable-remote
+```
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| `{"connected":false}` on `/health` | PLC is off or IP/port is wrong | Check `PLC_HOST` and `PLC_PORT` in the batch file |
+| `403 forbidden` on `/write` | Server started with `-readonly` | Remove `-readonly` from the batch file |
+| `403 forbidden` on `/remote/*` | `-enable-remote` is not set | Add `-enable-remote` to the batch file |
+| `503 busy` | Too many simultaneous requests | Increase `-queue-size` (default: 32) |
+| Port already in use | Another process is using the port | Change `LISTEN_PORT` to a free port |
+| Window closes immediately | Startup error | Run from Command Prompt to see the error message |
+
 ## Run
 
 For the Windows release binary:
