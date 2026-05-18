@@ -185,6 +185,24 @@ func handleRead(plc *PLCQueue) http.HandlerFunc {
 
 		sint := r.URL.Query().Get("sint") == "true"
 
+		if da.Bit >= 0 {
+			if dword || sint {
+				writeErr(w, http.StatusBadRequest, "bad_request", "dword and sint are not supported with bit access")
+				return
+			}
+			if count != 1 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "count must be 1 for bit access")
+				return
+			}
+			val, err := plc.ReadWordBit(r.Context(), da.Device, da.Addr, da.Bit)
+			if err != nil {
+				writePLCErr(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"values": []bool{val}})
+			return
+		}
+
 		if (dword || sint) && !isWordDevice(da.Device) {
 			if dword {
 				writeErr(w, http.StatusBadRequest, "bad_request", "dword is only supported for word devices")
@@ -264,6 +282,37 @@ func handleWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 
 		dword := r.URL.Query().Get("dword") == "true"
 		sint := r.URL.Query().Get("sint") == "true"
+
+		if da.Bit >= 0 {
+			if dword || sint {
+				writeErr(w, http.StatusBadRequest, "bad_request", "dword and sint are not supported with bit access")
+				return
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, maxWriteBody)
+			var body struct {
+				Values json.RawMessage `json:"values"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				var maxBytesErr *http.MaxBytesError
+				if errors.As(err, &maxBytesErr) {
+					writeErr(w, http.StatusRequestEntityTooLarge, "bad_request", "body must not be larger than "+strconv.FormatInt(maxBytesErr.Limit, 10)+" bytes")
+					return
+				}
+				writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+				return
+			}
+			var vals []bool
+			if err := json.Unmarshal(body.Values, &vals); err != nil || len(vals) != 1 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "values must be an array of exactly one boolean for bit access")
+				return
+			}
+			if err := plc.WriteWordBit(r.Context(), da.Device, da.Addr, da.Bit, vals[0]); err != nil {
+				writePLCErr(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+			return
+		}
 
 		if (dword || sint) && !isWordDevice(da.Device) {
 			if dword {

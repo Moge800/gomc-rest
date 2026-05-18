@@ -185,7 +185,7 @@ go build -o gomc-rest .
 | --- | --- | --- | --- |
 | `GET` | `/openapi.yaml` | なし | OpenAPI 3.1 仕様書（YAML） |
 | `GET` | `/version` | なし | `{"version":"v0.5.0"}` またはローカルビルドでは `{"version":"dev"}` |
-| `GET` | `/metrics` | なし | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"recent_avg_latency_ms":0,"queue_length":0}` |
+| `GET` | `/metrics` | なし | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
 | `GET` | `/health` | なし | `{"plc_status":"ok","connected":true}` または `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1`、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false` | `{"values":[100,200]}` または `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` 必須、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false`、body: `{"values":[1,2,3]}` または `{"values":[true,false]}` | `{"ok":true}` |
@@ -220,7 +220,23 @@ go build -o gomc-rest .
 
 タイマ・カウンタの接点・コイルは 2 文字プレフィックスで指定します: `TC`（タイマ接点）、`TS`（タイマコイル）、`CC`（カウンタ接点）、`CS`（カウンタコイル）。単一文字の `T` や `C` は有効なデバイス名ではなく `400 bad_request` になります。
 
-アドレス番号は多くのデバイスで**10進数**です。`X`、`Y`、`B`、`SB`、`W`、`SW`、`ZR`、`DX`、`DY` は**16進数**で指定します（例: `X4F`、`Y12D2`、`W1D`）。不明なデバイス、番号なし、無効な番号、負数は `400 bad_request` になります。
+アドレス番号は 0 以上の整数である必要があります。不明なデバイス、番号なし、数値でない番号、負数は `400 bad_request` になります。`X`・`Y`・`B`・`SB`・`W`・`SW`・`ZR`・`DX`・`DY` のアドレス番号は 16 進数で指定します（例: `X4F`, `Y12D2`, `W1D`）。
+
+### ワードデバイスのビット単位アクセス
+
+ワードデバイスのアドレスに `.ビット番号`（0〜15）を付けると、1 ビットのみを読み書きできます。
+
+```
+D3500.0   ← D3500 の第 0 ビット（最下位）
+D3500.15  ← D3500 の第 15 ビット（最上位）
+W1D.7     ← W0x1D の第 7 ビット
+```
+
+- 読み取り: `{"values": [true]}` または `{"values": [false]}` を返します。
+- 書き込み: body は `{"values": [true]}` または `{"values": [false]}` のみ（要素数 1 固定）。内部で read-modify-write を実行します。
+- `dword=true` または `sint=true` との組み合わせは `400 bad_request` になります。
+- `count` は 1 固定です（`count=2` などは `400 bad_request`）。
+- ビットデバイス（`X`、`M` など）に `.N` を付けると `400 bad_request` になります。
 
 ## エラーレスポンス
 

@@ -271,14 +271,14 @@ paths:
         - name: addr
           in: query
           required: true
-          description: "PLC device address, e.g. `D100`, `M0`, `X1F`"
+          description: "PLC device address, e.g. `D100`, `M0`, `X1F`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (0–15), e.g. `D3500.0`; count must be 1 and returns a single boolean."
           schema:
             type: string
             example: "D100"
         - name: count
           in: query
           required: false
-          description: Number of values to read (default 1, max 1024; max 512 when dword=true)
+          description: Number of values to read (default 1, max 1024; max 512 when dword=true; must be 1 for bit access)
           schema:
             type: integer
             default: 1
@@ -366,7 +366,7 @@ paths:
         - name: addr
           in: query
           required: true
-          description: "PLC device address, e.g. `D100`, `M0`"
+          description: "PLC device address, e.g. `D100`, `M0`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (0–15), e.g. `D3500.0`; body must be a single boolean."
           schema:
             type: string
             example: "D100"

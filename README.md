@@ -185,7 +185,7 @@ All successful write and remote-control operations return:
 | --- | --- | --- | --- |
 | `GET` | `/openapi.yaml` | none | OpenAPI 3.1 specification (YAML) |
 | `GET` | `/version` | none | `{"version":"v0.5.0"}` or `{"version":"dev"}` for local builds |
-| `GET` | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"recent_avg_latency_ms":0,"queue_length":0}` |
+| `GET` | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
 | `GET` | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1`, `dword` optional and defaults to `false`, `sint` optional and defaults to `false` | `{"values":[100,200]}` or `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` required, `dword` optional and defaults to `false`, `sint` optional and defaults to `false`; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
@@ -220,7 +220,23 @@ Device addresses are case-insensitive and may include surrounding whitespace. Th
 
 Timer and counter contacts and coils use two-letter prefixes: `TC` (timer contact), `TS` (timer coil), `CC` (counter contact), `CS` (counter coil). The single-letter forms `T` and `C` are not valid device names and return `400 bad_request`.
 
-The address number is **decimal** for most devices. The following devices use **hexadecimal**: `X`, `Y`, `B`, `SB`, `W`, `SW`, `ZR`, `DX`, `DY` — for example, `X4F`, `Y12D2`, `W1D`. Unknown devices, missing numbers, invalid numbers, and negative numbers return `400 bad_request`.
+The numeric address must be a non-negative integer. Unknown devices, missing numbers, non-numeric numbers, and negative numbers return `400 bad_request`. The devices `X`, `Y`, `B`, `SB`, `W`, `SW`, `ZR`, `DX`, and `DY` use hexadecimal address numbers (e.g. `X4F`, `Y12D2`, `W1D`).
+
+### Word Device Bit Access
+
+Append `.bit` (0–15) to a word device address to read or write a single bit within the 16-bit register.
+
+```
+D3500.0   ← bit 0 (LSB) of D3500
+D3500.15  ← bit 15 (MSB) of D3500
+W1D.7     ← bit 7 of W0x1D
+```
+
+- Read returns `{"values": [true]}` or `{"values": [false]}`.
+- Write body must be `{"values": [true]}` or `{"values": [false]}` (exactly one element). The server performs a read-modify-write internally.
+- `dword=true` or `sint=true` combined with bit access returns `400 bad_request`.
+- `count` must be 1; `count=2` or higher returns `400 bad_request`.
+- Appending `.N` to a bit device (e.g. `M0.0`) returns `400 bad_request`.
 
 ## Error Responses
 

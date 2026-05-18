@@ -412,6 +412,72 @@ func TestHandleWriteSintDwordRejectsOutOfRange(t *testing.T) {
 	}
 }
 
+func TestHandleReadBitAccessRejectsBitDevice(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=M0.0", nil)
+	rec := httptest.NewRecorder()
+
+	handleRead(newTestPLCQueue(t))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleReadBitAccessRejectsCount(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.0&count=2", nil)
+	rec := httptest.NewRecorder()
+
+	handleRead(newTestPLCQueue(t))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleReadBitAccessRejectsDword(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.0&dword=true", nil)
+	rec := httptest.NewRecorder()
+
+	handleRead(newTestPLCQueue(t))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWriteBitAccessRejectsBitDevice(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=M0.0", strings.NewReader(`{"values":[true]}`))
+	rec := httptest.NewRecorder()
+
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWriteBitAccessRejectsDword(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.0&dword=true", strings.NewReader(`{"values":[true]}`))
+	rec := httptest.NewRecorder()
+
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWriteBitAccessRejectsMultipleValues(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.0", strings.NewReader(`{"values":[true,false]}`))
+	rec := httptest.NewRecorder()
+
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
 func TestHandleWriteReadOnlyRejects(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100", strings.NewReader(`{"values":[1]}`))
 	rec := httptest.NewRecorder()
