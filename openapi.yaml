@@ -177,7 +177,7 @@ paths:
                 properties:
                   version:
                     type: string
-                    example: "v0.5.0"
+                    example: "v0.9.0"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
 
@@ -201,7 +201,7 @@ paths:
                     example: v0.5.0
                   gomcprotocol_version:
                     type: string
-                    example: v0.3.0
+                    example: "v0.3.0"
                   host:
                     type: string
                     example: 192.168.0.1

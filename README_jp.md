@@ -171,7 +171,8 @@ go build -o gomc-rest .
 | `-readonly` | `GOMCR_READONLY` | `false` | `true` のとき `/write` と `/remote/*` の POST 操作を拒否 |
 | `-enable-remote` | `GOMCR_ENABLE_REMOTE` | `false` | `true` のとき `/remote/*` エンドポイントを有効化 |
 | `-log-file` | `GOMCR_LOG_FILE` | _(なし)_ | ログファイルのパス。指定するとファイルと stderr の両方に出力 |
-| `-verbose` | `GOMCR_VERBOSE` | `false` | `true` のとき PLC 操作ごとのデバッグログ（`plc_op` エントリ）を出力 |
+| `-log-level` | `GOMCR_LOG_LEVEL` | `info` | ターミナルのログレベル: `debug`、`info`、`warn`、または `error` |
+| `-log-file-level` | `GOMCR_LOG_FILE_LEVEL` | `warn` | ファイルへのログレベル: `debug`、`info`、`warn`、または `error`。`-log-file` 指定時のみ有効 |
 
 ## API リファレンス
 
@@ -184,8 +185,8 @@ go build -o gomc-rest .
 | Method | Path | パラメータ / body | レスポンス |
 | --- | --- | --- | --- |
 | `GET` | `/openapi.yaml` | なし | OpenAPI 3.1 仕様書（YAML） |
-| `GET` | `/version` | なし | `{"version":"v0.5.0"}` またはローカルビルドでは `{"version":"dev"}` |
-| `GET` | `/info` | なし | `{"version":"v0.5.0","gomcprotocol_version":"v0.3.0","host":"192.168.0.1","port":5007,"frame":"3e","transport":"tcp","mode":"binary","listen_addrs":["192.168.1.10:8080"],"readonly":false,"enable_remote":false}` |
+| `GET` | `/version` | なし | `{"version":"v0.9.0"}` またはローカルビルドでは `{"version":"dev"}` |
+| `GET` | `/info` | なし | `{"version":"v0.9.0","gomcprotocol_version":"v0.3.0","host":"192.168.0.1","port":5007,"frame":"3e","transport":"tcp","mode":"binary","listen_addrs":["192.168.1.10:8080"],"readonly":false,"enable_remote":false}` |
 | `GET` | `/metrics` | なし | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"recent_avg_latency_ms":0,"queue_length":0}` |
 | `GET` | `/health` | なし | `{"plc_status":"ok","connected":true}` または `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1`、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false` | `{"values":[100,200]}` または `{"values":[true,false]}` |

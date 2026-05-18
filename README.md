@@ -171,7 +171,8 @@ Flags take priority. Environment variables provide the default values for those 
 | `-readonly` | `GOMCR_READONLY` | `false` | Set to `true` to reject POST operations on `/write` and `/remote/*` |
 | `-enable-remote` | `GOMCR_ENABLE_REMOTE` | `false` | Set to `true` to enable remote-control endpoints (`/remote/*`) |
 | `-log-file` | `GOMCR_LOG_FILE` | _(none)_ | Path to log file; if set, logs are written to both the file and stderr |
-| `-verbose` | `GOMCR_VERBOSE` | `false` | Set to `true` to enable debug-level PLC operation logging (`plc_op` entries per request) |
+| `-log-level` | `GOMCR_LOG_LEVEL` | `info` | Terminal log level: `debug`, `info`, `warn`, or `error` |
+| `-log-file-level` | `GOMCR_LOG_FILE_LEVEL` | `warn` | File log level: `debug`, `info`, `warn`, or `error`; only used with `-log-file` |
 
 ## API Reference
 
@@ -184,8 +185,8 @@ All successful write and remote-control operations return:
 | Method | Path | Parameters / body | Response |
 | --- | --- | --- | --- |
 | `GET` | `/openapi.yaml` | none | OpenAPI 3.1 specification (YAML) |
-| `GET` | `/version` | none | `{"version":"v0.5.0"}` or `{"version":"dev"}` for local builds |
-| `GET` | `/info` | none | `{"version":"v0.5.0","gomcprotocol_version":"v0.3.0","host":"192.168.0.1","port":5007,"frame":"3e","transport":"tcp","mode":"binary","listen_addrs":["192.168.1.10:8080"],"readonly":false,"enable_remote":false}` |
+| `GET` | `/version` | none | `{"version":"v0.9.0"}` or `{"version":"dev"}` for local builds |
+| `GET` | `/info` | none | `{"version":"v0.9.0","gomcprotocol_version":"v0.3.0","host":"192.168.0.1","port":5007,"frame":"3e","transport":"tcp","mode":"binary","listen_addrs":["192.168.1.10:8080"],"readonly":false,"enable_remote":false}` |
 | `GET` | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"recent_avg_latency_ms":0,"queue_length":0}` |
 | `GET` | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1`, `dword` optional and defaults to `false`, `sint` optional and defaults to `false` | `{"values":[100,200]}` or `{"values":[true,false]}` |
