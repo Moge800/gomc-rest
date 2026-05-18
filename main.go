@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+
+	charmlog "github.com/charmbracelet/log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,8 +35,11 @@ func main() {
 		logLevel = slog.LevelDebug
 	}
 	handlerOpts := &slog.HandlerOptions{Level: logLevel}
-	stderrHandler := slog.NewTextHandler(os.Stderr, handlerOpts)
-	var handler slog.Handler = stderrHandler
+	charmLogger := charmlog.NewWithOptions(os.Stderr, charmlog.Options{
+		Level:           charmlog.Level(logLevel),
+		ReportTimestamp: true,
+	})
+	var handler slog.Handler = charmLogger
 	if cfg.LogFile != "" {
 		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
@@ -45,7 +50,7 @@ func main() {
 			Handler:    slog.NewTextHandler(f, handlerOpts),
 			logSuccess: cfg.LogSuccess,
 		}
-		handler = &teeHandler{handlers: []slog.Handler{stderrHandler, fileHandler}}
+		handler = &teeHandler{handlers: []slog.Handler{charmLogger, fileHandler}}
 	}
 	log.SetOutput(os.Stderr)
 	slog.SetDefault(slog.New(handler))
