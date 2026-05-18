@@ -103,7 +103,7 @@ func parseAddr(s string) (ParsedAddr, error) {
 	if hexAddrDevs[dev] {
 		n, err := strconv.ParseInt(addrPart, 16, 64)
 		if err != nil || n < 0 || n > math.MaxInt {
-			return ParsedAddr{}, fmt.Errorf("invalid address number in %q", s)
+			return ParsedAddr{}, fmt.Errorf("invalid address number in %q (hexadecimal expected)", s)
 		}
 		addr = int(n)
 	} else {

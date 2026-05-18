@@ -185,7 +185,7 @@ All successful write and remote-control operations return:
 | --- | --- | --- | --- |
 | `GET` | `/openapi.yaml` | none | OpenAPI 3.1 specification (YAML) |
 | `GET` | `/version` | none | `{"version":"v0.5.0"}` or `{"version":"dev"}` for local builds |
-| `GET` | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"queue_length":0}` |
+| `GET` | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"recent_avg_latency_ms":0,"queue_length":0}` |
 | `GET` | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1`, `dword` optional and defaults to `false`, `sint` optional and defaults to `false` | `{"values":[100,200]}` or `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` required, `dword` optional and defaults to `false`, `sint` optional and defaults to `false`; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
