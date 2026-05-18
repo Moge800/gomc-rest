@@ -222,6 +222,7 @@ paths:
                   - reconnect_count
                   - plc_error_count
                   - avg_latency_ms
+                  - recent_avg_latency_ms
                   - queue_length
                 properties:
                   request_count:
@@ -239,8 +240,13 @@ paths:
                   avg_latency_ms:
                     type: number
                     format: double
-                    description: Average PLC round-trip latency in milliseconds
-                    example: 8.3
+                    description: Average PLC round-trip latency since process start, in milliseconds (2 decimal places)
+                    example: 8.33
+                  recent_avg_latency_ms:
+                    type: number
+                    format: double
+                    description: Average PLC round-trip latency for the most recent 100 requests, in milliseconds (2 decimal places)
+                    example: 7.12
                   queue_length:
                     type: integer
                     description: Current number of pending operations in the queue

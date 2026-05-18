@@ -128,7 +128,7 @@ func (p *PLCClient) do(fn func(plcConnection) error) error {
 	p.metrics.requests.Add(1)
 	start := time.Now()
 	err := fn(p.conn)
-	p.metrics.totalNs.Add(time.Since(start).Nanoseconds())
+	p.metrics.recordLatency(time.Since(start).Nanoseconds())
 
 	if err == nil {
 		return nil
@@ -168,7 +168,7 @@ func (p *PLCClient) doReset() error {
 	p.metrics.requests.Add(1)
 	start := time.Now()
 	err := p.conn.RemoteReset()
-	p.metrics.totalNs.Add(time.Since(start).Nanoseconds())
+	p.metrics.recordLatency(time.Since(start).Nanoseconds())
 	p.conn = nil // PLC closes connection on reset regardless of error
 
 	var connErr *mc.MCProtocolConnectionError
