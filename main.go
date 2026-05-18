@@ -52,6 +52,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/openapi.yaml", handleOpenAPI(openAPISpec))
 	mux.HandleFunc("/version", handleVersion())
+	mux.HandleFunc("/info", handleInfo(cfg))
 	mux.HandleFunc("/metrics", handleMetrics(plcQueue))
 	mux.HandleFunc("/health", handleHealth(plcQueue))
 	mux.HandleFunc("/read", handleRead(plcQueue))

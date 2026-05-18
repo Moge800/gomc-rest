@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"net"
 	"net/http"
 	"strconv"
 
@@ -121,6 +122,58 @@ func handleVersion() http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"version": version})
 	}
+}
+
+// GET /info
+func handleInfo(cfg ServerConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"version":       version,
+			"host":          cfg.Host,
+			"port":          cfg.Port,
+			"frame":         string(cfg.Frame),
+			"transport":     string(cfg.Transport),
+			"mode":          cfg.ModeString,
+			"listen":        cfg.Listen,
+			"listen_addrs":  listenAddrs(cfg.Listen),
+			"readonly":      cfg.ReadOnly,
+			"enable_remote": cfg.EnableRemote,
+		})
+	}
+}
+
+// listenAddrs returns the IP addresses the server is reachable on.
+// If the listen address binds to all interfaces (host empty or 0.0.0.0),
+// it returns all non-loopback IPv4 addresses on the machine.
+// Otherwise it returns the single configured host.
+func listenAddrs(listen string) []string {
+	host, _, err := net.SplitHostPort(listen)
+	if err != nil {
+		return nil
+	}
+	if host != "" && host != "0.0.0.0" {
+		return []string{host}
+	}
+	ifaces, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil
+	}
+	var addrs []string
+	for _, a := range ifaces {
+		ipnet, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		ip := ipnet.IP.To4()
+		if ip == nil || ip.IsLoopback() {
+			continue
+		}
+		addrs = append(addrs, ip.String())
+	}
+	return addrs
 }
 
 // GET /health
