@@ -7,6 +7,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"strconv"
 
 	mc "github.com/moge800/gomcprotocol"
@@ -138,11 +139,27 @@ func handleInfo(cfg ServerConfig) http.HandlerFunc {
 			"transport":     string(cfg.Transport),
 			"mode":          cfg.ModeString,
 			"listen":        cfg.Listen,
-			"listen_addrs":  listenAddrs(cfg.Listen),
-			"readonly":      cfg.ReadOnly,
-			"enable_remote": cfg.EnableRemote,
+			"listen_addrs":        listenAddrs(cfg.Listen),
+			"readonly":            cfg.ReadOnly,
+			"enable_remote":       cfg.EnableRemote,
+			"gomcprotocol_version": gomcprotocolVersion(),
 		})
 	}
+}
+
+// gomcprotocolVersion returns the version of the embedded gomcprotocol module
+// by reading the build info embedded in the binary at startup.
+func gomcprotocolVersion() string {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	for _, dep := range bi.Deps {
+		if dep.Path == "github.com/moge800/gomcprotocol" {
+			return dep.Version
+		}
+	}
+	return "unknown"
 }
 
 // listenAddrs returns the IP addresses the server is reachable on.
