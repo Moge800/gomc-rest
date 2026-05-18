@@ -138,8 +138,7 @@ func handleInfo(cfg ServerConfig) http.HandlerFunc {
 			"frame":         string(cfg.Frame),
 			"transport":     string(cfg.Transport),
 			"mode":          cfg.ModeString,
-			"listen":        cfg.Listen,
-			"listen_addrs":        listenAddrs(cfg.Listen),
+			"listen_addrs":  listenAddrs(cfg.Listen),
 			"readonly":            cfg.ReadOnly,
 			"enable_remote":       cfg.EnableRemote,
 			"gomcprotocol_version": gomcprotocolVersion(),
@@ -162,17 +161,17 @@ func gomcprotocolVersion() string {
 	return "unknown"
 }
 
-// listenAddrs returns the IP addresses the server is reachable on.
+// listenAddrs returns the addresses (host:port) the HTTP server is reachable on.
 // If the listen address binds to all interfaces (host empty or 0.0.0.0),
-// it returns all non-loopback IPv4 addresses on the machine.
-// Otherwise it returns the single configured host.
+// it returns all non-loopback IPv4 addresses combined with the port.
+// Otherwise it returns the single configured address.
 func listenAddrs(listen string) []string {
-	host, _, err := net.SplitHostPort(listen)
+	host, port, err := net.SplitHostPort(listen)
 	if err != nil {
 		return nil
 	}
 	if host != "" && host != "0.0.0.0" {
-		return []string{host}
+		return []string{net.JoinHostPort(host, port)}
 	}
 	ifaces, err := net.InterfaceAddrs()
 	if err != nil {
@@ -188,7 +187,7 @@ func listenAddrs(listen string) []string {
 		if ip == nil || ip.IsLoopback() {
 			continue
 		}
-		addrs = append(addrs, ip.String())
+		addrs = append(addrs, net.JoinHostPort(ip.String(), port))
 	}
 	return addrs
 }
