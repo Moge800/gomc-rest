@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 
@@ -34,6 +35,7 @@ func main() {
 		Level:           charmlog.Level(cfg.LogLevel),
 		ReportTimestamp: true,
 	})
+	logOut := io.Writer(os.Stderr)
 	var handler slog.Handler = charmLogger
 	if cfg.LogFile != "" {
 		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
@@ -41,10 +43,11 @@ func main() {
 			log.Fatalf("open log file %q: %v", cfg.LogFile, err)
 		}
 		defer f.Close()
+		logOut = io.MultiWriter(os.Stderr, f)
 		fileHandler := slog.NewTextHandler(f, &slog.HandlerOptions{Level: cfg.LogFileLevel})
 		handler = &teeHandler{handlers: []slog.Handler{charmLogger, fileHandler}}
 	}
-	log.SetOutput(os.Stderr)
+	log.SetOutput(logOut)
 	slog.SetDefault(slog.New(handler))
 
 	plc := newConfiguredPLCClient(cfg)

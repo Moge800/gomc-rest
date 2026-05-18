@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -69,3 +70,44 @@ func TestLogRequestsStatusCode(t *testing.T) {
 		})
 	}
 }
+
+func TestLogRequestsLevel(t *testing.T) {
+	cases := []struct {
+		status    int
+		wantLevel slog.Level
+	}{
+		{http.StatusOK, slog.LevelInfo},
+		{http.StatusNotFound, slog.LevelWarn},
+		{http.StatusServiceUnavailable, slog.LevelError},
+	}
+	for _, tc := range cases {
+		t.Run(http.StatusText(tc.status), func(t *testing.T) {
+			var got slog.Level
+			h := &levelCaptureHandler{level: &got}
+			orig := slog.Default()
+			slog.SetDefault(slog.New(h))
+			t.Cleanup(func() { slog.SetDefault(orig) })
+
+			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tc.status)
+			})
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			logRequests(handler).ServeHTTP(httptest.NewRecorder(), req)
+
+			if got != tc.wantLevel {
+				t.Errorf("status %d → level %v, want %v", tc.status, got, tc.wantLevel)
+			}
+		})
+	}
+}
+
+// levelCaptureHandler captures the level of the last slog record it receives.
+type levelCaptureHandler struct{ level *slog.Level }
+
+func (h *levelCaptureHandler) Enabled(_ context.Context, _ slog.Level) bool { return true }
+func (h *levelCaptureHandler) Handle(_ context.Context, r slog.Record) error {
+	*h.level = r.Level
+	return nil
+}
+func (h *levelCaptureHandler) WithAttrs(_ []slog.Attr) slog.Handler  { return h }
+func (h *levelCaptureHandler) WithGroup(_ string) slog.Handler        { return h }
