@@ -228,7 +228,7 @@ Append `.N` (single hex digit, `0`–`F`) to a word device address to read or wr
 
 ```
 D3500.0   ← bit 0 (LSB) of D3500
-D3500.15  ← bit 15 (MSB) of D3500
+D3500.F   ← bit 15 (MSB) of D3500
 W1D.7     ← bit 7 of W1D (hex address 0x1D)
 ```
 
