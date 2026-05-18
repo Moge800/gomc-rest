@@ -224,12 +224,12 @@ The numeric address must be a non-negative integer. Unknown devices, missing num
 
 ### Word Device Bit Access
 
-Append `.bit` (0–15) to a word device address to read or write a single bit within the 16-bit register.
+Append `.N` (0–15) to a word device address to read or write a single bit within the 16-bit register.
 
 ```
 D3500.0   ← bit 0 (LSB) of D3500
 D3500.15  ← bit 15 (MSB) of D3500
-W1D.7     ← bit 7 of W0x1D
+W1D.7     ← bit 7 of W1D (hex address 0x1D)
 ```
 
 - Read returns `{"values": [true]}` or `{"values": [false]}`.

@@ -187,7 +187,7 @@ func handleRead(plc *PLCQueue) http.HandlerFunc {
 
 		if da.Bit >= 0 {
 			if dword || sint {
-				writeErr(w, http.StatusBadRequest, "bad_request", "dword and sint are not supported with bit access")
+				writeErr(w, http.StatusBadRequest, "bad_request", "dword and sint flags are not supported with bit access")
 				return
 			}
 			if count != 1 {
@@ -285,7 +285,7 @@ func handleWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 
 		if da.Bit >= 0 {
 			if dword || sint {
-				writeErr(w, http.StatusBadRequest, "bad_request", "dword and sint are not supported with bit access")
+				writeErr(w, http.StatusBadRequest, "bad_request", "dword and sint flags are not supported with bit access")
 				return
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, maxWriteBody)
