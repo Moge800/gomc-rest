@@ -220,7 +220,7 @@ Device addresses are case-insensitive and may include surrounding whitespace. Th
 
 Timer and counter contacts and coils use two-letter prefixes: `TC` (timer contact), `TS` (timer coil), `CC` (counter contact), `CS` (counter coil). The single-letter forms `T` and `C` are not valid device names and return `400 bad_request`.
 
-The numeric address must be a non-negative integer. Unknown devices, missing numbers, non-numeric numbers, and negative numbers return `400 bad_request`.
+The address number is **decimal** for most devices. The following devices use **hexadecimal**: `X`, `Y`, `B`, `SB`, `W`, `SW`, `ZR`, `DX`, `DY` — for example, `X4F`, `Y12D2`, `W1D`. Unknown devices, missing numbers, invalid numbers, and negative numbers return `400 bad_request`.
 
 ## Error Responses
 

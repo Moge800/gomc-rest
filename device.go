@@ -25,6 +25,13 @@ var wordDevs = map[string]bool{
 	"TN": true, "STN": true, "CN": true, "Z": true, "SW": true, "SD": true,
 }
 
+// hexAddrDevs mirrors gomcprotocol: these devices use hexadecimal numbering.
+// All other valid devices use decimal.
+var hexAddrDevs = map[string]bool{
+	"X": true, "Y": true, "B": true, "SB": true,
+	"W": true, "SW": true, "ZR": true, "DX": true, "DY": true,
+}
+
 // multiCharPrefixes holds all device names longer than one character, sorted
 // longest-first so that e.g. "STC" is matched before "S".
 var multiCharPrefixes = func() []string {
@@ -68,9 +75,19 @@ func parseAddr(s string) (mc.DeviceAddr, error) {
 		return mc.DeviceAddr{}, fmt.Errorf("missing address number in %q", s)
 	}
 
-	addr, err := strconv.Atoi(rest)
-	if err != nil || addr < 0 {
-		return mc.DeviceAddr{}, fmt.Errorf("invalid address number in %q", s)
+	var addr int
+	if hexAddrDevs[dev] {
+		n, err := strconv.ParseInt(rest, 16, 64)
+		if err != nil || n < 0 {
+			return mc.DeviceAddr{}, fmt.Errorf("invalid address number in %q (hex expected)", s)
+		}
+		addr = int(n)
+	} else {
+		n, err := strconv.Atoi(rest)
+		if err != nil || n < 0 {
+			return mc.DeviceAddr{}, fmt.Errorf("invalid address number in %q", s)
+		}
+		addr = n
 	}
 
 	return mc.DeviceAddr{Device: dev, Addr: addr}, nil
