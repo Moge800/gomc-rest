@@ -9,6 +9,8 @@ import (
 	"io"
 	"log"
 	"log/slog"
+
+	charmlog "github.com/charmbracelet/log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,7 +31,12 @@ func main() {
 	}
 
 	// setup logger
+	charmLogger := charmlog.NewWithOptions(os.Stderr, charmlog.Options{
+		Level:           charmlog.Level(cfg.LogLevel),
+		ReportTimestamp: true,
+	})
 	logOut := io.Writer(os.Stderr)
+	var handler slog.Handler = charmLogger
 	if cfg.LogFile != "" {
 		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
@@ -37,13 +44,11 @@ func main() {
 		}
 		defer f.Close()
 		logOut = io.MultiWriter(os.Stderr, f)
+		fileHandler := slog.NewTextHandler(f, &slog.HandlerOptions{Level: cfg.LogFileLevel})
+		handler = &teeHandler{handlers: []slog.Handler{charmLogger, fileHandler}}
 	}
 	log.SetOutput(logOut)
-	logLevel := slog.LevelInfo
-	if cfg.Verbose {
-		logLevel = slog.LevelDebug
-	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: logLevel})))
+	slog.SetDefault(slog.New(handler))
 
 	plc := newConfiguredPLCClient(cfg)
 	plcQueue := newPLCQueue(plc, cfg.QueueSize)
@@ -85,7 +90,7 @@ func main() {
 			"mode", cfg.ModeString,
 			"readonly", cfg.ReadOnly,
 			"enable_remote", cfg.EnableRemote,
-			"verbose", cfg.Verbose,
+			"log_level", cfg.LogLevel,
 			"queue_size", cfg.QueueSize,
 			"timeout", cfg.Timeout,
 		)

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -27,19 +28,20 @@ const (
 )
 
 type ServerConfig struct {
-	Host       string
-	Port       int
-	Mode       mc.Mode
-	ModeString string
-	Listen     string
+	Host         string
+	Port         int
+	Mode         mc.Mode
+	ModeString   string
+	Listen       string
 	ReadOnly     bool
 	EnableRemote bool
-	Verbose      bool
-	Frame      PLCFrame
-	Transport  PLCTransport
-	QueueSize  int
-	Timeout    time.Duration
-	LogFile    string
+	Frame        PLCFrame
+	Transport    PLCTransport
+	QueueSize    int
+	Timeout      time.Duration
+	LogFile      string
+	LogLevel     slog.Level
+	LogFileLevel slog.Level
 }
 
 func parseConfig(args []string, lookupEnv func(string) string, output io.Writer) (ServerConfig, error) {
@@ -55,26 +57,25 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 	listen := fs.String("listen", getenvWith(lookupEnv, "GOMCR_LISTEN", ":8080"), "HTTP listen address")
 	readonly := fs.Bool("readonly", false, "disable write and remote-control endpoints")
 	enableRemote := fs.Bool("enable-remote", false, "enable remote-control endpoints (run/stop/pause/latch-clear/reset)")
-	verbose := fs.Bool("verbose", false, "enable debug-level PLC operation logging")
 	frameStr := fs.String("frame", getenvWith(lookupEnv, "GOMCR_FRAME", string(frame3E)), "MC Protocol frame (3e|4e)")
 	transportStr := fs.String("transport", getenvWith(lookupEnv, "GOMCR_TRANSPORT", string(transportTCP)), "PLC transport (tcp|udp)")
 	queueSizeStr := fs.String("queue-size", getenvWith(lookupEnv, "GOMCR_QUEUE_SIZE", "32"), "PLC communication queue size")
 	timeoutStr := fs.String("timeout", getenvWith(lookupEnv, "GOMCR_TIMEOUT", "5s"), "PLC communication timeout")
 	logFile := fs.String("log-file", getenvWith(lookupEnv, "GOMCR_LOG_FILE", ""), "path to log file (empty = console only)")
+	logLevelStr := fs.String("log-level", getenvWith(lookupEnv, "GOMCR_LOG_LEVEL", "info"), "terminal log level (debug|info|warn|error)")
+	logFileLevelStr := fs.String("log-file-level", getenvWith(lookupEnv, "GOMCR_LOG_FILE_LEVEL", "warn"), "file log level (debug|info|warn|error); only used with -log-file")
 
 	if err := fs.Parse(args); err != nil {
 		return ServerConfig{}, err
 	}
 
-	var readonlySet, enableRemoteSet, verboseSet bool
+	var readonlySet, enableRemoteSet bool
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "readonly":
 			readonlySet = true
 		case "enable-remote":
 			enableRemoteSet = true
-		case "verbose":
-			verboseSet = true
 		}
 	})
 	if !readonlySet {
@@ -90,13 +91,6 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 			return ServerConfig{}, err
 		}
 		*enableRemote = enableRemoteDefault
-	}
-	if !verboseSet {
-		verboseDefault, err := getenvBoolWith(lookupEnv, "GOMCR_VERBOSE", false)
-		if err != nil {
-			return ServerConfig{}, err
-		}
-		*verbose = verboseDefault
 	}
 
 	port, err := strconv.Atoi(*portStr)
@@ -141,21 +135,47 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		return ServerConfig{}, fmt.Errorf("invalid timeout %q: must be a positive duration", *timeoutStr)
 	}
 
+	logLevel, err := parseLogLevel(*logLevelStr)
+	if err != nil {
+		return ServerConfig{}, fmt.Errorf("invalid log-level %q: must be debug, info, warn, or error", *logLevelStr)
+	}
+
+	logFileLevel, err := parseLogLevel(*logFileLevelStr)
+	if err != nil {
+		return ServerConfig{}, fmt.Errorf("invalid log-file-level %q: must be debug, info, warn, or error", *logFileLevelStr)
+	}
+
 	return ServerConfig{
-		Host:       *host,
-		Port:       port,
-		Mode:       mode,
-		ModeString: *modeStr,
-		Listen:     normalizeListen(*listen),
+		Host:         *host,
+		Port:         port,
+		Mode:         mode,
+		ModeString:   *modeStr,
+		Listen:       normalizeListen(*listen),
 		ReadOnly:     *readonly,
 		EnableRemote: *enableRemote,
-		Verbose:      *verbose,
-		Frame:      frame,
-		Transport:  transport,
-		QueueSize:  queueSize,
-		Timeout:    timeout,
-		LogFile:    *logFile,
+		Frame:        frame,
+		Transport:    transport,
+		QueueSize:    queueSize,
+		Timeout:      timeout,
+		LogFile:      *logFile,
+		LogLevel:     logLevel,
+		LogFileLevel: logFileLevel,
 	}, nil
+}
+
+func parseLogLevel(s string) (slog.Level, error) {
+	switch strings.ToLower(s) {
+	case "debug":
+		return slog.LevelDebug, nil
+	case "info":
+		return slog.LevelInfo, nil
+	case "warn":
+		return slog.LevelWarn, nil
+	case "error":
+		return slog.LevelError, nil
+	default:
+		return slog.LevelInfo, fmt.Errorf("unknown level %q", s)
+	}
 }
 
 func getenvWith(lookupEnv func(string) string, key, fallback string) string {

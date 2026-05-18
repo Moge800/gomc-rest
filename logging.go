@@ -10,6 +10,48 @@ import (
 	mc "github.com/moge800/gomcprotocol"
 )
 
+// teeHandler fans out log records to multiple handlers.
+type teeHandler struct {
+	handlers []slog.Handler
+}
+
+func (t *teeHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	for _, h := range t.handlers {
+		if h.Enabled(ctx, level) {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *teeHandler) Handle(ctx context.Context, r slog.Record) error {
+	var firstErr error
+	for _, h := range t.handlers {
+		if h.Enabled(ctx, r.Level) {
+			if err := h.Handle(ctx, r.Clone()); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return firstErr
+}
+
+func (t *teeHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	hs := make([]slog.Handler, len(t.handlers))
+	for i, h := range t.handlers {
+		hs[i] = h.WithAttrs(attrs)
+	}
+	return &teeHandler{handlers: hs}
+}
+
+func (t *teeHandler) WithGroup(name string) slog.Handler {
+	hs := make([]slog.Handler, len(t.handlers))
+	for i, h := range t.handlers {
+		hs[i] = h.WithGroup(name)
+	}
+	return &teeHandler{handlers: hs}
+}
+
 // logPLCOp logs a single PLC operation result via slog.
 func logPLCOp(addr string, d time.Duration, err error) {
 	result := "ok"
@@ -67,12 +109,20 @@ func recoverPanic(h http.Handler) http.Handler {
 }
 
 // logRequests wraps h and logs each request via slog.
+// 2xx → Info, 4xx → Warn, 5xx → Error.
 func logRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		h.ServeHTTP(rec, r)
-		slog.Info("request",
+		level := slog.LevelInfo
+		if rec.status >= 500 {
+			level = slog.LevelError
+		} else if rec.status >= 400 {
+			level = slog.LevelWarn
+		}
+		slog.Log(r.Context(), level, "request",
+			"remote", r.RemoteAddr,
 			"method", r.Method,
 			"path", r.URL.Path,
 			"query", r.URL.RawQuery,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -766,20 +767,20 @@ func TestParseConfigEnableRemoteFlagOverridesInvalidEnv(t *testing.T) {
 	}
 }
 
-func TestParseConfigVerboseFlag(t *testing.T) {
-	cfg, err := parseConfig([]string{"-verbose"}, emptyEnv, nil)
+func TestParseConfigLogLevelFlag(t *testing.T) {
+	cfg, err := parseConfig([]string{"-log-level", "debug"}, emptyEnv, nil)
 	if err != nil {
 		t.Fatalf("parseConfig: %v", err)
 	}
-	if !cfg.Verbose {
-		t.Fatal("Verbose = false, want true")
+	if cfg.LogLevel != slog.LevelDebug {
+		t.Fatalf("LogLevel = %v, want DEBUG", cfg.LogLevel)
 	}
 }
 
-func TestParseConfigVerboseEnv(t *testing.T) {
+func TestParseConfigLogLevelEnv(t *testing.T) {
 	lookupEnv := func(key string) string {
-		if key == "GOMCR_VERBOSE" {
-			return "true"
+		if key == "GOMCR_LOG_LEVEL" {
+			return "warn"
 		}
 		return ""
 	}
@@ -787,8 +788,8 @@ func TestParseConfigVerboseEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseConfig: %v", err)
 	}
-	if !cfg.Verbose {
-		t.Fatal("Verbose = false, want true")
+	if cfg.LogLevel != slog.LevelWarn {
+		t.Fatalf("LogLevel = %v, want WARN", cfg.LogLevel)
 	}
 }
 
