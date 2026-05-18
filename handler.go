@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"net"
 	"net/http"
+	"runtime/debug"
 	"strconv"
 
 	mc "github.com/moge800/gomcprotocol"
@@ -121,6 +123,78 @@ func handleVersion() http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"version": version})
 	}
+}
+
+// GET /info
+func handleInfo(cfg ServerConfig) http.HandlerFunc {
+	// Compute once at handler creation; neither value changes during the process lifetime.
+	addrs := listenAddrs(cfg.Listen)
+	mcVersion := gomcprotocolVersion()
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"version":              version,
+			"gomcprotocol_version": mcVersion,
+			"host":                 cfg.Host,
+			"port":                 cfg.Port,
+			"frame":                string(cfg.Frame),
+			"transport":            string(cfg.Transport),
+			"mode":                 cfg.ModeString,
+			"listen_addrs":         addrs,
+			"readonly":             cfg.ReadOnly,
+			"enable_remote":        cfg.EnableRemote,
+		})
+	}
+}
+
+// gomcprotocolVersion returns the version of the embedded gomcprotocol module
+// by reading the build info embedded in the binary at startup.
+func gomcprotocolVersion() string {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	for _, dep := range bi.Deps {
+		if dep.Path == "github.com/moge800/gomcprotocol" {
+			return dep.Version
+		}
+	}
+	return "unknown"
+}
+
+// listenAddrs returns the addresses (host:port) the HTTP server is reachable on.
+// If the listen address binds to all interfaces (host empty or 0.0.0.0),
+// it returns all non-loopback IPv4 addresses combined with the port.
+// Otherwise it returns the single configured address.
+func listenAddrs(listen string) []string {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return nil
+	}
+	if host != "" {
+		if ip := net.ParseIP(host); ip == nil || !ip.IsUnspecified() {
+			return []string{net.JoinHostPort(host, port)}
+		}
+	}
+	ifaces, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil
+	}
+	var addrs []string
+	for _, a := range ifaces {
+		ipnet, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		ip := ipnet.IP.To4()
+		if ip == nil || ip.IsLoopback() {
+			continue
+		}
+		addrs = append(addrs, net.JoinHostPort(ip.String(), port))
+	}
+	return addrs
 }
 
 // GET /health
