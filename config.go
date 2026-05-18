@@ -35,6 +35,7 @@ type ServerConfig struct {
 	ReadOnly     bool
 	EnableRemote bool
 	Verbose      bool
+	LogSuccess   bool
 	Frame      PLCFrame
 	Transport  PLCTransport
 	QueueSize  int
@@ -56,6 +57,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 	readonly := fs.Bool("readonly", false, "disable write and remote-control endpoints")
 	enableRemote := fs.Bool("enable-remote", false, "enable remote-control endpoints (run/stop/pause/latch-clear/reset)")
 	verbose := fs.Bool("verbose", false, "enable debug-level PLC operation logging")
+	logSuccess := fs.Bool("log-success", false, "log successful (2xx) requests; by default only 4xx/5xx are logged")
 	frameStr := fs.String("frame", getenvWith(lookupEnv, "GOMCR_FRAME", string(frame3E)), "MC Protocol frame (3e|4e)")
 	transportStr := fs.String("transport", getenvWith(lookupEnv, "GOMCR_TRANSPORT", string(transportTCP)), "PLC transport (tcp|udp)")
 	queueSizeStr := fs.String("queue-size", getenvWith(lookupEnv, "GOMCR_QUEUE_SIZE", "32"), "PLC communication queue size")
@@ -66,7 +68,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		return ServerConfig{}, err
 	}
 
-	var readonlySet, enableRemoteSet, verboseSet bool
+	var readonlySet, enableRemoteSet, verboseSet, logSuccessSet bool
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "readonly":
@@ -75,6 +77,8 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 			enableRemoteSet = true
 		case "verbose":
 			verboseSet = true
+		case "log-success":
+			logSuccessSet = true
 		}
 	})
 	if !readonlySet {
@@ -97,6 +101,13 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 			return ServerConfig{}, err
 		}
 		*verbose = verboseDefault
+	}
+	if !logSuccessSet {
+		logSuccessDefault, err := getenvBoolWith(lookupEnv, "GOMCR_LOG_SUCCESS", false)
+		if err != nil {
+			return ServerConfig{}, err
+		}
+		*logSuccess = logSuccessDefault
 	}
 
 	port, err := strconv.Atoi(*portStr)
@@ -150,6 +161,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		ReadOnly:     *readonly,
 		EnableRemote: *enableRemote,
 		Verbose:      *verbose,
+		LogSuccess:   *logSuccess,
 		Frame:      frame,
 		Transport:  transport,
 		QueueSize:  queueSize,

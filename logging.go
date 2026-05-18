@@ -67,11 +67,15 @@ func recoverPanic(h http.Handler) http.Handler {
 }
 
 // logRequests wraps h and logs each request via slog.
-func logRequests(h http.Handler) http.Handler {
+// When logSuccess is false, 2xx responses are not logged.
+func logRequests(h http.Handler, logSuccess bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		h.ServeHTTP(rec, r)
+		if !logSuccess && rec.status < 400 {
+			return
+		}
 		slog.Info("request",
 			"method", r.Method,
 			"path", r.URL.Path,

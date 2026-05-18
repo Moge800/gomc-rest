@@ -65,7 +65,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           logRequests(recoverPanic(mux)),
+		Handler:           logRequests(recoverPanic(mux), cfg.LogSuccess),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      30 * time.Second,
