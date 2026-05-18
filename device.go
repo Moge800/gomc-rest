@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,8 +26,6 @@ var wordDevs = map[string]bool{
 	"TN": true, "STN": true, "CN": true, "Z": true, "SW": true, "SD": true,
 }
 
-// hexAddrDevs mirrors gomcprotocol: these devices use hexadecimal numbering.
-// All other valid devices use decimal.
 var hexAddrDevs = map[string]bool{
 	"X": true, "Y": true, "B": true, "SB": true,
 	"W": true, "SW": true, "ZR": true, "DX": true, "DY": true,
@@ -47,10 +46,17 @@ var multiCharPrefixes = func() []string {
 	return ps
 }()
 
-func parseAddr(s string) (mc.DeviceAddr, error) {
+// ParsedAddr extends mc.DeviceAddr with an optional bit index for word devices.
+// Bit == -1 means no bit access; 0–15 means access that bit of the word register.
+type ParsedAddr struct {
+	mc.DeviceAddr
+	Bit int
+}
+
+func parseAddr(s string) (ParsedAddr, error) {
 	s = strings.ToUpper(strings.TrimSpace(s))
 	if len(s) < 2 {
-		return mc.DeviceAddr{}, fmt.Errorf("invalid device address: %q", s)
+		return ParsedAddr{}, fmt.Errorf("invalid device address: %q", s)
 	}
 
 	var dev string
@@ -69,28 +75,50 @@ func parseAddr(s string) (mc.DeviceAddr, error) {
 	}
 
 	if !validDevs[dev] {
-		return mc.DeviceAddr{}, fmt.Errorf("unknown device: %q", dev)
+		return ParsedAddr{}, fmt.Errorf("unknown device: %q", dev)
 	}
 	if rest == "" {
-		return mc.DeviceAddr{}, fmt.Errorf("missing address number in %q", s)
+		return ParsedAddr{}, fmt.Errorf("missing address number in %q", s)
+	}
+
+	// Split optional bit suffix, e.g. "3500.A" → addrPart="3500", bitPart="A"
+	bit := -1
+	addrPart := rest
+	if i := strings.IndexByte(rest, '.'); i >= 0 {
+		if !wordDevs[dev] {
+			return ParsedAddr{}, fmt.Errorf("bit access (.N) is only supported for word devices, not %q", dev)
+		}
+		bitStr := rest[i+1:]
+		if len(bitStr) != 1 {
+			return ParsedAddr{}, fmt.Errorf("invalid bit index in %q: must be a single hex digit 0–F", s)
+		}
+		bitN, err := strconv.ParseInt(bitStr, 16, 64)
+		if err != nil {
+			return ParsedAddr{}, fmt.Errorf("invalid bit index in %q: must be a single hex digit 0–F", s)
+		}
+		bit = int(bitN)
+		addrPart = rest[:i]
+		if addrPart == "" {
+			return ParsedAddr{}, fmt.Errorf("missing address number in %q", s)
+		}
 	}
 
 	var addr int
 	if hexAddrDevs[dev] {
-		n, err := strconv.ParseInt(rest, 16, 64)
-		if err != nil || n < 0 {
-			return mc.DeviceAddr{}, fmt.Errorf("invalid address number in %q (hex expected)", s)
+		n, err := strconv.ParseInt(addrPart, 16, 64)
+		if err != nil || n < 0 || n > math.MaxInt {
+			return ParsedAddr{}, fmt.Errorf("invalid address number in %q (hexadecimal expected)", s)
 		}
 		addr = int(n)
 	} else {
-		n, err := strconv.Atoi(rest)
+		n, err := strconv.Atoi(addrPart)
 		if err != nil || n < 0 {
-			return mc.DeviceAddr{}, fmt.Errorf("invalid address number in %q", s)
+			return ParsedAddr{}, fmt.Errorf("invalid address number in %q", s)
 		}
 		addr = n
 	}
 
-	return mc.DeviceAddr{Device: dev, Addr: addr}, nil
+	return ParsedAddr{DeviceAddr: mc.DeviceAddr{Device: dev, Addr: addr}, Bit: bit}, nil
 }
 
 func isWordDevice(dev string) bool {

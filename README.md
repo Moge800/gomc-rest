@@ -220,7 +220,23 @@ Device addresses are case-insensitive and may include surrounding whitespace. Th
 
 Timer and counter contacts and coils use two-letter prefixes: `TC` (timer contact), `TS` (timer coil), `CC` (counter contact), `CS` (counter coil). The single-letter forms `T` and `C` are not valid device names and return `400 bad_request`.
 
-The address number is **decimal** for most devices. The following devices use **hexadecimal**: `X`, `Y`, `B`, `SB`, `W`, `SW`, `ZR`, `DX`, `DY` — for example, `X4F`, `Y12D2`, `W1D`. Unknown devices, missing numbers, invalid numbers, and negative numbers return `400 bad_request`.
+The numeric address must be a non-negative integer. Unknown devices, missing numbers, non-numeric numbers, and negative numbers return `400 bad_request`. The devices `X`, `Y`, `B`, `SB`, `W`, `SW`, `ZR`, `DX`, and `DY` use hexadecimal address numbers (e.g. `X4F`, `Y12D2`, `W1D`).
+
+### Word Device Bit Access
+
+Append `.N` (single hex digit, `0`–`F`) to a word device address to read or write a single bit within the 16-bit register.
+
+```
+D3500.0   ← bit 0 (LSB) of D3500
+D3500.F   ← bit 15 (MSB) of D3500
+W1D.7     ← bit 7 of W1D (hex address 0x1D)
+```
+
+- Read returns `{"values": [true]}` or `{"values": [false]}`.
+- Write body must be `{"values": [true]}` or `{"values": [false]}` (exactly one element). The server performs a read-modify-write internally.
+- `dword=true` or `sint=true` combined with bit access returns `400 bad_request`.
+- `count` must be 1; `count=2` or higher returns `400 bad_request`.
+- Appending `.N` to a bit device (e.g. `M0.0`) returns `400 bad_request`.
 
 ## Error Responses
 

@@ -234,6 +234,47 @@ func (q *PLCQueue) WriteBits(ctx context.Context, device string, start int, valu
 	return err
 }
 
+func (q *PLCQueue) ReadWordBit(ctx context.Context, device string, addr, bit int) (bool, error) {
+	t := time.Now()
+	value, err := q.work.Do(ctx, func() (any, error) {
+		var result bool
+		err := q.plc.do(func(c plcConnection) error {
+			words, readErr := c.ReadWords(device, addr, 1)
+			if readErr != nil {
+				return readErr
+			}
+			result = (words[0]>>uint(bit))&1 == 1
+			return nil
+		})
+		return result, err
+	})
+	logPLCOp(device+strconv.Itoa(addr)+"."+strconv.Itoa(bit), time.Since(t), err)
+	if err != nil {
+		return false, err
+	}
+	return value.(bool), nil
+}
+
+func (q *PLCQueue) WriteWordBit(ctx context.Context, device string, addr, bit int, value bool) error {
+	t := time.Now()
+	_, err := q.work.Do(ctx, func() (any, error) {
+		return nil, q.plc.do(func(c plcConnection) error {
+			words, err := c.ReadWords(device, addr, 1)
+			if err != nil {
+				return err
+			}
+			if value {
+				words[0] |= 1 << uint(bit)
+			} else {
+				words[0] &^= 1 << uint(bit)
+			}
+			return c.WriteWords(device, addr, words)
+		})
+	})
+	logPLCOp(device+strconv.Itoa(addr)+"."+strconv.Itoa(bit), time.Since(t), err)
+	return err
+}
+
 func (q *PLCQueue) RemoteRun(ctx context.Context, clear int, force bool) error {
 	t := time.Now()
 	_, err := q.work.Do(ctx, func() (any, error) {

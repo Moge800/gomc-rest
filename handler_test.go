@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -409,6 +410,174 @@ func TestHandleWriteSintDwordRejectsOutOfRange(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("body=%s status = %d, want %d", body, rec.Code, http.StatusBadRequest)
 		}
+	}
+}
+
+func TestHandleReadBitAccessRejectsBitDevice(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=M0.0", nil)
+	rec := httptest.NewRecorder()
+
+	handleRead(newTestPLCQueue(t))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleReadBitAccessRejectsCount(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.0&count=2", nil)
+	rec := httptest.NewRecorder()
+
+	handleRead(newTestPLCQueue(t))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleReadBitAccessRejectsDword(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.0&dword=true", nil)
+	rec := httptest.NewRecorder()
+
+	handleRead(newTestPLCQueue(t))(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWriteBitAccessRejectsBitDevice(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=M0.0", strings.NewReader(`{"values":[true]}`))
+	rec := httptest.NewRecorder()
+
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWriteBitAccessRejectsDword(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.0&dword=true", strings.NewReader(`{"values":[true]}`))
+	rec := httptest.NewRecorder()
+
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWriteBitAccessRejectsMultipleValues(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.0", strings.NewReader(`{"values":[true,false]}`))
+	rec := httptest.NewRecorder()
+
+	handleWrite(newTestPLCQueue(t), false)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+// mockConn implements plcConnection with a simple word register map.
+type mockConn struct {
+	words map[string]uint16
+}
+
+func (m *mockConn) ReadWords(device string, start, count int) ([]uint16, error) {
+	key := device + strconv.Itoa(start)
+	out := make([]uint16, count)
+	if v, ok := m.words[key]; ok {
+		out[0] = v
+	}
+	return out, nil
+}
+func (m *mockConn) WriteWords(device string, start int, values []uint16) error {
+	m.words[device+strconv.Itoa(start)] = values[0]
+	return nil
+}
+func (m *mockConn) ReadBits(_ string, _ int, _ int) ([]bool, error)  { return nil, nil }
+func (m *mockConn) WriteBits(_ string, _ int, _ []bool) error         { return nil }
+func (m *mockConn) RemoteRun(_ int, _ bool) error                     { return nil }
+func (m *mockConn) RemoteStop() error                                  { return nil }
+func (m *mockConn) RemotePause(_ bool) error                           { return nil }
+func (m *mockConn) RemoteLatchClear() error                            { return nil }
+func (m *mockConn) RemoteReset() error                                 { return nil }
+func (m *mockConn) Close() error                                       { return nil }
+
+func newMockPLCQueue(t *testing.T, words map[string]uint16) *PLCQueue {
+	t.Helper()
+	plc := newPLCClient("127.0.0.1", 5007, mc.ModeBinary)
+	plc.conn = &mockConn{words: words}
+	q := newPLCQueue(plc, 32)
+	t.Cleanup(func() {
+		_ = q.Shutdown(context.Background())
+		q.Close()
+	})
+	return q
+}
+
+func TestHandleReadBitAccessReturnsBoolean(t *testing.T) {
+	// D3500 = 0b0000_0000_0000_0101 → bit0=true, bit1=false, bit2=true
+	q := newMockPLCQueue(t, map[string]uint16{"D3500": 0b101})
+
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.0", nil)
+	rec := httptest.NewRecorder()
+	handleRead(q)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	vals, _ := body["values"].([]any)
+	if len(vals) != 1 || vals[0] != true {
+		t.Errorf("values = %v, want [true]", vals)
+	}
+
+	// bit1 should be false
+	req2 := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.1", nil)
+	rec2 := httptest.NewRecorder()
+	handleRead(q)(rec2, req2)
+	var body2 map[string]any
+	_ = json.NewDecoder(rec2.Body).Decode(&body2)
+	vals2, _ := body2["values"].([]any)
+	if len(vals2) != 1 || vals2[0] != false {
+		t.Errorf("values = %v, want [false]", vals2)
+	}
+}
+
+func TestHandleWriteBitAccessSetsAndClears(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{"D3500": 0})
+
+	// set bit0
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.0", strings.NewReader(`{"values":[true]}`))
+	rec := httptest.NewRecorder()
+	handleWrite(q, false)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("set bit: status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	// read back: bit0 should be true
+	req2 := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.0", nil)
+	rec2 := httptest.NewRecorder()
+	handleRead(q)(rec2, req2)
+	var body map[string]any
+	_ = json.NewDecoder(rec2.Body).Decode(&body)
+	vals, _ := body["values"].([]any)
+	if len(vals) != 1 || vals[0] != true {
+		t.Errorf("after set: values = %v, want [true]", vals)
+	}
+
+	// clear bit0
+	req3 := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.0", strings.NewReader(`{"values":[false]}`))
+	rec3 := httptest.NewRecorder()
+	handleWrite(q, false)(rec3, req3)
+	if rec3.Code != http.StatusOK {
+		t.Fatalf("clear bit: status = %d, want %d", rec3.Code, http.StatusOK)
 	}
 }
 
