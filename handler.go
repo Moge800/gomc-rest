@@ -127,19 +127,22 @@ func handleVersion() http.HandlerFunc {
 
 // GET /info
 func handleInfo(cfg ServerConfig) http.HandlerFunc {
+	// Compute once at handler creation; neither value changes during the process lifetime.
+	addrs := listenAddrs(cfg.Listen)
+	mcVersion := gomcprotocolVersion()
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodGet) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"version":              version,
-			"gomcprotocol_version": gomcprotocolVersion(),
+			"gomcprotocol_version": mcVersion,
 			"host":                 cfg.Host,
 			"port":                 cfg.Port,
 			"frame":                string(cfg.Frame),
 			"transport":            string(cfg.Transport),
 			"mode":                 cfg.ModeString,
-			"listen_addrs":         listenAddrs(cfg.Listen),
+			"listen_addrs":         addrs,
 			"readonly":             cfg.ReadOnly,
 			"enable_remote":        cfg.EnableRemote,
 		})
