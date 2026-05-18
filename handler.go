@@ -132,16 +132,16 @@ func handleInfo(cfg ServerConfig) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"version":       version,
-			"host":          cfg.Host,
-			"port":          cfg.Port,
-			"frame":         string(cfg.Frame),
-			"transport":     string(cfg.Transport),
-			"mode":          cfg.ModeString,
-			"listen_addrs":  listenAddrs(cfg.Listen),
-			"readonly":            cfg.ReadOnly,
-			"enable_remote":       cfg.EnableRemote,
+			"version":              version,
 			"gomcprotocol_version": gomcprotocolVersion(),
+			"host":                 cfg.Host,
+			"port":                 cfg.Port,
+			"frame":                string(cfg.Frame),
+			"transport":            string(cfg.Transport),
+			"mode":                 cfg.ModeString,
+			"listen_addrs":         listenAddrs(cfg.Listen),
+			"readonly":             cfg.ReadOnly,
+			"enable_remote":        cfg.EnableRemote,
 		})
 	}
 }
@@ -170,8 +170,10 @@ func listenAddrs(listen string) []string {
 	if err != nil {
 		return nil
 	}
-	if host != "" && host != "0.0.0.0" {
-		return []string{net.JoinHostPort(host, port)}
+	if host != "" {
+		if ip := net.ParseIP(host); ip == nil || !ip.IsUnspecified() {
+			return []string{net.JoinHostPort(host, port)}
+		}
 	}
 	ifaces, err := net.InterfaceAddrs()
 	if err != nil {

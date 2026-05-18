@@ -229,11 +229,13 @@ func TestHandleReadRequiresGET(t *testing.T) {
 
 func TestInfoEndpointsRequireGET(t *testing.T) {
 	q := newTestPLCQueue(t)
+	cfg := ServerConfig{Host: "192.168.0.1", Port: 5007, Frame: frame3E, Transport: transportTCP, ModeString: "binary", Listen: "127.0.0.1:8080"}
 	cases := []struct {
 		name    string
 		handler http.Handler
 	}{
 		{"version", handleVersion()},
+		{"info", handleInfo(cfg)},
 		{"health", handleHealth(q)},
 		{"metrics", handleMetrics(q)},
 		{"openapi", handleOpenAPI(openAPISpec)},
@@ -242,6 +244,74 @@ func TestInfoEndpointsRequireGET(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assertRequiresGET(t, tc.handler)
 		})
+	}
+}
+
+func TestHandleInfo(t *testing.T) {
+	cfg := ServerConfig{
+		Host:         "192.168.0.1",
+		Port:         5007,
+		Frame:        frame3E,
+		Transport:    transportTCP,
+		ModeString:   "binary",
+		Listen:       "127.0.0.1:8080",
+		ReadOnly:     true,
+		EnableRemote: false,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/info", nil)
+	rec := httptest.NewRecorder()
+	handleInfo(cfg)(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, key := range []string{"version", "gomcprotocol_version", "host", "port", "frame", "transport", "mode", "listen_addrs", "readonly", "enable_remote"} {
+		if _, ok := body[key]; !ok {
+			t.Errorf("missing key %q", key)
+		}
+	}
+	if body["host"] != "192.168.0.1" {
+		t.Errorf("host = %v, want 192.168.0.1", body["host"])
+	}
+	if body["readonly"] != true {
+		t.Errorf("readonly = %v, want true", body["readonly"])
+	}
+}
+
+func TestListenAddrs(t *testing.T) {
+	cases := []struct {
+		listen  string
+		wantLen int    // -1 = any non-nil
+		wantVal string // non-empty = check first element
+		wantNil bool
+	}{
+		{"192.168.1.10:8080", 1, "192.168.1.10:8080", false},
+		{"127.0.0.1:8080", 1, "127.0.0.1:8080", false},
+		{":8080", -1, "", false},
+		{"[::]:8080", -1, "", false},
+		{"not-valid", 0, "", true},
+	}
+	for _, tc := range cases {
+		addrs := listenAddrs(tc.listen)
+		if tc.wantNil {
+			if addrs != nil {
+				t.Errorf("listenAddrs(%q) = %v, want nil", tc.listen, addrs)
+			}
+			continue
+		}
+		if addrs == nil {
+			t.Errorf("listenAddrs(%q) = nil, want non-nil", tc.listen)
+			continue
+		}
+		if tc.wantLen >= 0 && len(addrs) != tc.wantLen {
+			t.Errorf("listenAddrs(%q) len = %d, want %d", tc.listen, len(addrs), tc.wantLen)
+		}
+		if tc.wantVal != "" && addrs[0] != tc.wantVal {
+			t.Errorf("listenAddrs(%q)[0] = %q, want %q", tc.listen, addrs[0], tc.wantVal)
+		}
 	}
 }
 
@@ -1183,6 +1253,7 @@ func newTestMux(t *testing.T) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/openapi.yaml", handleOpenAPI(openAPISpec))
 	mux.HandleFunc("/version", handleVersion())
+	mux.HandleFunc("/info", handleInfo(ServerConfig{Host: "127.0.0.1", Port: 5007, Frame: frame3E, Transport: transportTCP, ModeString: "binary", Listen: "127.0.0.1:0"}))
 	mux.HandleFunc("/metrics", handleMetrics(q))
 	mux.HandleFunc("/health", handleHealth(q))
 	mux.HandleFunc("/read", handleRead(q))
@@ -1225,6 +1296,7 @@ func specPaths() []string {
 var registeredRoutes = []string{
 	"/openapi.yaml",
 	"/version",
+	"/info",
 	"/metrics",
 	"/health",
 	"/read",
