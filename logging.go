@@ -119,6 +119,7 @@ func logRequests(h http.Handler) http.Handler {
 			level = slog.LevelWarn
 		}
 		slog.Log(r.Context(), level, "request",
+			"remote", r.RemoteAddr,
 			"method", r.Method,
 			"path", r.URL.Path,
 			"query", r.URL.RawQuery,
