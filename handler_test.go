@@ -284,33 +284,31 @@ func TestHandleInfo(t *testing.T) {
 func TestListenAddrs(t *testing.T) {
 	cases := []struct {
 		listen  string
-		wantLen int    // -1 = any non-nil
+		wantLen int    // -1 = any (including nil); -2 = nil only
 		wantVal string // non-empty = check first element
-		wantNil bool
 	}{
-		{"192.168.1.10:8080", 1, "192.168.1.10:8080", false},
-		{"127.0.0.1:8080", 1, "127.0.0.1:8080", false},
-		{":8080", -1, "", false},
-		{"[::]:8080", -1, "", false},
-		{"not-valid", 0, "", true},
+		{"192.168.1.10:8080", 1, "192.168.1.10:8080"},
+		{"127.0.0.1:8080", 1, "127.0.0.1:8080"},
+		{":8080", -1, ""},      // may be nil in environments with no non-loopback IPv4
+		{"[::]:8080", -1, ""},  // same
+		{"not-valid", -2, ""},
 	}
 	for _, tc := range cases {
 		addrs := listenAddrs(tc.listen)
-		if tc.wantNil {
+		switch tc.wantLen {
+		case -2:
 			if addrs != nil {
 				t.Errorf("listenAddrs(%q) = %v, want nil", tc.listen, addrs)
 			}
-			continue
-		}
-		if addrs == nil {
-			t.Errorf("listenAddrs(%q) = nil, want non-nil", tc.listen)
-			continue
-		}
-		if tc.wantLen >= 0 && len(addrs) != tc.wantLen {
-			t.Errorf("listenAddrs(%q) len = %d, want %d", tc.listen, len(addrs), tc.wantLen)
-		}
-		if tc.wantVal != "" && addrs[0] != tc.wantVal {
-			t.Errorf("listenAddrs(%q)[0] = %q, want %q", tc.listen, addrs[0], tc.wantVal)
+		case -1:
+			// accept any result including nil
+		default:
+			if len(addrs) != tc.wantLen {
+				t.Errorf("listenAddrs(%q) len = %d, want %d", tc.listen, len(addrs), tc.wantLen)
+			}
+			if tc.wantVal != "" && len(addrs) > 0 && addrs[0] != tc.wantVal {
+				t.Errorf("listenAddrs(%q)[0] = %q, want %q", tc.listen, addrs[0], tc.wantVal)
+			}
 		}
 	}
 }

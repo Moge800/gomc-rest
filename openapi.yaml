@@ -161,10 +161,32 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
 
 paths:
+  /version:
+    get:
+      summary: Server version
+      description: Returns the server version string injected at build time.
+      operationId: getVersion
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version]
+                properties:
+                  version:
+                    type: string
+                    example: "v0.5.0"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+
   /info:
     get:
       summary: Server info
-      description: Returns server configuration, gomcprotocol version, and reachable listen addresses.
+      description: |
+        Returns server configuration, gomcprotocol version, and reachable listen addresses.
+        `gomcprotocol_version` reflects the version embedded at build time; it may show `(devel)` for local `go run` or test builds.
       operationId: getInfo
       responses:
         "200":
@@ -199,29 +221,12 @@ paths:
                     type: array
                     items:
                       type: string
-                    description: Reachable host:port addresses. Lists all non-loopback IPv4 addresses when bound to all interfaces.
+                    description: Reachable IPv4 host:port addresses. Lists all non-loopback IPv4 addresses when bound to all interfaces.
                     example: ["192.168.1.10:8080"]
                   readonly:
                     type: boolean
                   enable_remote:
                     type: boolean
-  /version:
-    get:
-      summary: Server version
-      description: Returns the server version string injected at build time.
-      operationId: getVersion
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [version]
-                properties:
-                  version:
-                    type: string
-                    example: "v0.5.0"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
 
