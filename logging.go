@@ -49,38 +49,6 @@ func (t *teeHandler) WithGroup(name string) slog.Handler {
 	return &teeHandler{handlers: hs}
 }
 
-// requestFilterHandler wraps a handler and suppresses successful request logs
-// (msg=="request" with status<400) when logSuccess is false.
-type requestFilterHandler struct {
-	slog.Handler
-	logSuccess bool
-}
-
-func (f *requestFilterHandler) Handle(ctx context.Context, r slog.Record) error {
-	if r.Message == "request" && !f.logSuccess {
-		var status int64
-		r.Attrs(func(a slog.Attr) bool {
-			if a.Key == "status" {
-				status = a.Value.Int64()
-				return false
-			}
-			return true
-		})
-		if status < 400 {
-			return nil
-		}
-	}
-	return f.Handler.Handle(ctx, r)
-}
-
-func (f *requestFilterHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &requestFilterHandler{Handler: f.Handler.WithAttrs(attrs), logSuccess: f.logSuccess}
-}
-
-func (f *requestFilterHandler) WithGroup(name string) slog.Handler {
-	return &requestFilterHandler{Handler: f.Handler.WithGroup(name), logSuccess: f.logSuccess}
-}
-
 // logPLCOp logs a single PLC operation result via slog.
 func logPLCOp(addr string, d time.Duration, err error) {
 	result := "ok"
@@ -138,12 +106,19 @@ func recoverPanic(h http.Handler) http.Handler {
 }
 
 // logRequests wraps h and logs each request via slog.
+// 2xx → Info, 4xx → Warn, 5xx → Error.
 func logRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		h.ServeHTTP(rec, r)
-		slog.Info("request",
+		level := slog.LevelInfo
+		if rec.status >= 500 {
+			level = slog.LevelError
+		} else if rec.status >= 400 {
+			level = slog.LevelWarn
+		}
+		slog.Log(r.Context(), level, "request",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"query", r.URL.RawQuery,

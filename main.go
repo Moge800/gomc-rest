@@ -30,13 +30,8 @@ func main() {
 	}
 
 	// setup logger
-	logLevel := slog.LevelInfo
-	if cfg.Verbose {
-		logLevel = slog.LevelDebug
-	}
-	handlerOpts := &slog.HandlerOptions{Level: logLevel}
 	charmLogger := charmlog.NewWithOptions(os.Stderr, charmlog.Options{
-		Level:           charmlog.Level(logLevel),
+		Level:           charmlog.Level(cfg.LogLevel),
 		ReportTimestamp: true,
 	})
 	var handler slog.Handler = charmLogger
@@ -46,10 +41,7 @@ func main() {
 			log.Fatalf("open log file %q: %v", cfg.LogFile, err)
 		}
 		defer f.Close()
-		fileHandler := &requestFilterHandler{
-			Handler:    slog.NewTextHandler(f, handlerOpts),
-			logSuccess: cfg.LogSuccess,
-		}
+		fileHandler := slog.NewTextHandler(f, &slog.HandlerOptions{Level: cfg.LogFileLevel})
 		handler = &teeHandler{handlers: []slog.Handler{charmLogger, fileHandler}}
 	}
 	log.SetOutput(os.Stderr)
@@ -95,7 +87,7 @@ func main() {
 			"mode", cfg.ModeString,
 			"readonly", cfg.ReadOnly,
 			"enable_remote", cfg.EnableRemote,
-			"verbose", cfg.Verbose,
+			"log_level", cfg.LogLevel,
 			"queue_size", cfg.QueueSize,
 			"timeout", cfg.Timeout,
 		)
