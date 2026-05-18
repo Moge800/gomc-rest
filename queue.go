@@ -248,7 +248,7 @@ func (q *PLCQueue) ReadWordBit(ctx context.Context, device string, addr, bit int
 		})
 		return result, err
 	})
-	logPLCOp(device+strconv.Itoa(addr), time.Since(t), err)
+	logPLCOp(device+strconv.Itoa(addr)+"."+strconv.Itoa(bit), time.Since(t), err)
 	if err != nil {
 		return false, err
 	}
@@ -271,7 +271,7 @@ func (q *PLCQueue) WriteWordBit(ctx context.Context, device string, addr, bit in
 			return c.WriteWords(device, addr, words)
 		})
 	})
-	logPLCOp(device+strconv.Itoa(addr), time.Since(t), err)
+	logPLCOp(device+strconv.Itoa(addr)+"."+strconv.Itoa(bit), time.Since(t), err)
 	return err
 }
 

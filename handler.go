@@ -301,6 +301,10 @@ func handleWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 				writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 				return
 			}
+			if len(body.Values) == 0 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "values is required")
+				return
+			}
 			var vals []bool
 			if err := json.Unmarshal(body.Values, &vals); err != nil || len(vals) != 1 {
 				writeErr(w, http.StatusBadRequest, "bad_request", "values must be an array of exactly one boolean for bit access")

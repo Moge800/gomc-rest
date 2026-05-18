@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -101,7 +102,7 @@ func parseAddr(s string) (ParsedAddr, error) {
 	var addr int
 	if hexAddrDevs[dev] {
 		n, err := strconv.ParseInt(addrPart, 16, 64)
-		if err != nil || n < 0 {
+		if err != nil || n < 0 || n > math.MaxInt {
 			return ParsedAddr{}, fmt.Errorf("invalid address number in %q", s)
 		}
 		addr = int(n)
