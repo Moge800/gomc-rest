@@ -81,18 +81,22 @@ func parseAddr(s string) (ParsedAddr, error) {
 		return ParsedAddr{}, fmt.Errorf("missing address number in %q", s)
 	}
 
-	// Split optional bit suffix, e.g. "3500.0" → addrPart="3500", bitPart="0"
+	// Split optional bit suffix, e.g. "3500.A" → addrPart="3500", bitPart="A"
 	bit := -1
 	addrPart := rest
 	if i := strings.IndexByte(rest, '.'); i >= 0 {
 		if !wordDevs[dev] {
 			return ParsedAddr{}, fmt.Errorf("bit access (.N) is only supported for word devices, not %q", dev)
 		}
-		bitN, err := strconv.Atoi(rest[i+1:])
-		if err != nil || bitN < 0 || bitN > 15 {
-			return ParsedAddr{}, fmt.Errorf("invalid bit index in %q: must be 0–15", s)
+		bitStr := rest[i+1:]
+		if len(bitStr) != 1 {
+			return ParsedAddr{}, fmt.Errorf("invalid bit index in %q: must be a single hex digit 0–F", s)
 		}
-		bit = bitN
+		bitN, err := strconv.ParseInt(bitStr, 16, 64)
+		if err != nil {
+			return ParsedAddr{}, fmt.Errorf("invalid bit index in %q: must be a single hex digit 0–F", s)
+		}
+		bit = int(bitN)
 		addrPart = rest[:i]
 		if addrPart == "" {
 			return ParsedAddr{}, fmt.Errorf("missing address number in %q", s)
