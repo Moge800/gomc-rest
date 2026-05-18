@@ -965,7 +965,7 @@ func TestHandleMetrics(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	for _, key := range []string{"request_count", "reconnect_count", "plc_error_count", "avg_latency_ms", "queue_length"} {
+	for _, key := range []string{"request_count", "reconnect_count", "plc_error_count", "avg_latency_ms", "recent_avg_latency_ms", "queue_length"} {
 		if _, ok := body[key]; !ok {
 			t.Errorf("missing field %q", key)
 		}
@@ -975,6 +975,35 @@ func TestHandleMetrics(t *testing.T) {
 	}
 	if body["avg_latency_ms"] != float64(0) {
 		t.Errorf("avg_latency_ms = %v, want 0", body["avg_latency_ms"])
+	}
+	if body["recent_avg_latency_ms"] != float64(0) {
+		t.Errorf("recent_avg_latency_ms = %v, want 0", body["recent_avg_latency_ms"])
+	}
+}
+
+func TestHandleMetricsLatencyRounding(t *testing.T) {
+	q := newTestPLCQueue(t)
+
+	// Record 3 latencies that average to 1.23456...ms → should round to 1.23
+	// 1234567 + 1234567 + 1234567 ns = 3703701 ns, avg = 1234567 ns = 1.234567 ms → 1.23
+	q.plc.metrics.requests.Add(3)
+	q.plc.metrics.recordLatency(1234567)
+	q.plc.metrics.recordLatency(1234567)
+	q.plc.metrics.recordLatency(1234567)
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	handleMetrics(q)(rec, req)
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["avg_latency_ms"] != float64(1.23) {
+		t.Errorf("avg_latency_ms = %v, want 1.23", body["avg_latency_ms"])
+	}
+	if body["recent_avg_latency_ms"] != float64(1.23) {
+		t.Errorf("recent_avg_latency_ms = %v, want 1.23", body["recent_avg_latency_ms"])
 	}
 }
 

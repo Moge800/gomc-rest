@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"math"
 	"strconv"
 	"sync"
 	"time"
@@ -291,13 +292,14 @@ func (q *PLCQueue) Metrics() map[string]any {
 	reqs := m.requests.Load()
 	var avgMs float64
 	if reqs > 0 {
-		avgMs = float64(m.totalNs.Load()) / float64(reqs) / 1e6
+		avgMs = math.Round(float64(m.totalNs.Load())/float64(reqs)/1e6*100) / 100
 	}
 	return map[string]any{
-		"request_count":   reqs,
-		"reconnect_count": m.reconnects.Load(),
-		"plc_error_count": m.plcErrors.Load(),
-		"avg_latency_ms":  avgMs,
-		"queue_length":    len(q.work.jobs),
+		"request_count":        reqs,
+		"reconnect_count":      m.reconnects.Load(),
+		"plc_error_count":      m.plcErrors.Load(),
+		"avg_latency_ms":       avgMs,
+		"recent_avg_latency_ms": m.recentAvgMs(),
+		"queue_length":         len(q.work.jobs),
 	}
 }
