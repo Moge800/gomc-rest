@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
 	"net/http"
@@ -29,21 +28,27 @@ func main() {
 	}
 
 	// setup logger
-	logOut := io.Writer(os.Stderr)
+	logLevel := slog.LevelInfo
+	if cfg.Verbose {
+		logLevel = slog.LevelDebug
+	}
+	handlerOpts := &slog.HandlerOptions{Level: logLevel}
+	stderrHandler := slog.NewTextHandler(os.Stderr, handlerOpts)
+	var handler slog.Handler = stderrHandler
 	if cfg.LogFile != "" {
 		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
 			log.Fatalf("open log file %q: %v", cfg.LogFile, err)
 		}
 		defer f.Close()
-		logOut = io.MultiWriter(os.Stderr, f)
+		fileHandler := &requestFilterHandler{
+			Handler:    slog.NewTextHandler(f, handlerOpts),
+			logSuccess: cfg.LogSuccess,
+		}
+		handler = &teeHandler{handlers: []slog.Handler{stderrHandler, fileHandler}}
 	}
-	log.SetOutput(logOut)
-	logLevel := slog.LevelInfo
-	if cfg.Verbose {
-		logLevel = slog.LevelDebug
-	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: logLevel})))
+	log.SetOutput(os.Stderr)
+	slog.SetDefault(slog.New(handler))
 
 	plc := newConfiguredPLCClient(cfg)
 	plcQueue := newPLCQueue(plc, cfg.QueueSize)
@@ -65,7 +70,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           logRequests(recoverPanic(mux), cfg.LogSuccess),
+		Handler:           logRequests(recoverPanic(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      30 * time.Second,

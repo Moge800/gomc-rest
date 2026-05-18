@@ -62,7 +62,7 @@ func TestLogRequestsStatusCode(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			logRequests(tc.handler, true).ServeHTTP(rec, req)
+			logRequests(tc.handler).ServeHTTP(rec, req)
 			if rec.Code != tc.wantStatus {
 				t.Fatalf("status = %d, want %d", rec.Code, tc.wantStatus)
 			}

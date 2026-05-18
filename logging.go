@@ -10,6 +10,77 @@ import (
 	mc "github.com/moge800/gomcprotocol"
 )
 
+// teeHandler fans out log records to multiple handlers.
+type teeHandler struct {
+	handlers []slog.Handler
+}
+
+func (t *teeHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	for _, h := range t.handlers {
+		if h.Enabled(ctx, level) {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *teeHandler) Handle(ctx context.Context, r slog.Record) error {
+	for _, h := range t.handlers {
+		if h.Enabled(ctx, r.Level) {
+			_ = h.Handle(ctx, r.Clone())
+		}
+	}
+	return nil
+}
+
+func (t *teeHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	hs := make([]slog.Handler, len(t.handlers))
+	for i, h := range t.handlers {
+		hs[i] = h.WithAttrs(attrs)
+	}
+	return &teeHandler{handlers: hs}
+}
+
+func (t *teeHandler) WithGroup(name string) slog.Handler {
+	hs := make([]slog.Handler, len(t.handlers))
+	for i, h := range t.handlers {
+		hs[i] = h.WithGroup(name)
+	}
+	return &teeHandler{handlers: hs}
+}
+
+// requestFilterHandler wraps a handler and suppresses successful request logs
+// (msg=="request" with status<400) when logSuccess is false.
+type requestFilterHandler struct {
+	slog.Handler
+	logSuccess bool
+}
+
+func (f *requestFilterHandler) Handle(ctx context.Context, r slog.Record) error {
+	if r.Message == "request" && !f.logSuccess {
+		var status int64
+		r.Attrs(func(a slog.Attr) bool {
+			if a.Key == "status" {
+				status = a.Value.Int64()
+				return false
+			}
+			return true
+		})
+		if status < 400 {
+			return nil
+		}
+	}
+	return f.Handler.Handle(ctx, r)
+}
+
+func (f *requestFilterHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &requestFilterHandler{Handler: f.Handler.WithAttrs(attrs), logSuccess: f.logSuccess}
+}
+
+func (f *requestFilterHandler) WithGroup(name string) slog.Handler {
+	return &requestFilterHandler{Handler: f.Handler.WithGroup(name), logSuccess: f.logSuccess}
+}
+
 // logPLCOp logs a single PLC operation result via slog.
 func logPLCOp(addr string, d time.Duration, err error) {
 	result := "ok"
@@ -67,15 +138,11 @@ func recoverPanic(h http.Handler) http.Handler {
 }
 
 // logRequests wraps h and logs each request via slog.
-// When logSuccess is false, 2xx responses are not logged.
-func logRequests(h http.Handler, logSuccess bool) http.Handler {
+func logRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		h.ServeHTTP(rec, r)
-		if !logSuccess && rec.status < 400 {
-			return
-		}
 		slog.Info("request",
 			"method", r.Method,
 			"path", r.URL.Path,
