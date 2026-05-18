@@ -11,18 +11,22 @@ func TestParseAddr(t *testing.T) {
 		in   string
 		want mc.DeviceAddr
 	}{
-		// 1文字プレフィックス
+		// 10進数アドレスデバイス
 		{"D100", mc.DeviceAddr{Device: "D", Addr: 100}},
-		{"W0", mc.DeviceAddr{Device: "W", Addr: 0}},
-		{"X10", mc.DeviceAddr{Device: "X", Addr: 10}},
-		{"Y1", mc.DeviceAddr{Device: "Y", Addr: 1}},
 		{"M0", mc.DeviceAddr{Device: "M", Addr: 0}},
-		// 2文字プレフィックス
-		{"ZR512", mc.DeviceAddr{Device: "ZR", Addr: 512}},
-		{"SB10", mc.DeviceAddr{Device: "SB", Addr: 10}},
-		{"SW5", mc.DeviceAddr{Device: "SW", Addr: 5}},
 		{"SM100", mc.DeviceAddr{Device: "SM", Addr: 100}},
 		{"SD200", mc.DeviceAddr{Device: "SD", Addr: 200}},
+		// 16進数アドレスデバイス
+		{"X10", mc.DeviceAddr{Device: "X", Addr: 0x10}},  // 16
+		{"X4F", mc.DeviceAddr{Device: "X", Addr: 0x4F}},  // 79
+		{"Y1", mc.DeviceAddr{Device: "Y", Addr: 0x1}},
+		{"Y12D2", mc.DeviceAddr{Device: "Y", Addr: 0x12D2}}, // 4818
+		{"B18FD", mc.DeviceAddr{Device: "B", Addr: 0x18FD}}, // 6397
+		{"W0", mc.DeviceAddr{Device: "W", Addr: 0}},
+		{"W1D", mc.DeviceAddr{Device: "W", Addr: 0x1D}},  // 29
+		{"ZR512", mc.DeviceAddr{Device: "ZR", Addr: 0x512}}, // 1298
+		{"SB10", mc.DeviceAddr{Device: "SB", Addr: 0x10}}, // 16
+		{"SW5", mc.DeviceAddr{Device: "SW", Addr: 0x5}},
 		{"TN10", mc.DeviceAddr{Device: "TN", Addr: 10}},
 		{"CN5", mc.DeviceAddr{Device: "CN", Addr: 5}},
 		{"TC10", mc.DeviceAddr{Device: "TC", Addr: 10}},
@@ -60,8 +64,10 @@ func TestParseAddr(t *testing.T) {
 		"Q100",   // 不明デバイス
 		"T10",    // 単一文字 T は無効（TC を使う）
 		"C5",     // 単一文字 C は無効（CC を使う）
-		"Dabc",   // 番号が非数値
+		"Dabc",   // D は10進数、abc は無効
 		"D-1",    // 負数
+		"X-1",    // X は16進数、負数は無効
+		"XGGGG",  // 16進数として無効
 	}
 
 	wordDevCases := []struct {
