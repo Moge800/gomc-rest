@@ -372,10 +372,7 @@ func (q *PLCQueue) RemoteLatchClear(ctx context.Context) error {
 func (q *PLCQueue) RemoteReset(ctx context.Context) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {
-		plcStart := time.Now()
-		doErr := q.plc.doReset()
-		writePLCLatency(ctx, time.Since(plcStart))
-		return nil, doErr
+		return nil, q.plc.doReset(ctx)
 	})
 	logPLCOp("remote_reset", time.Since(t), err)
 	return err
