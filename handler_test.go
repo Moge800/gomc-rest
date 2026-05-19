@@ -1352,6 +1352,96 @@ func TestOpenAPISpecVsRoutes(t *testing.T) {
 	})
 }
 
+func TestMetricsClientFields(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{"D100": 42})
+
+	// one successful read → client_request_count=1, busy_count=0, latency recorded
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100", nil)
+	rec := httptest.NewRecorder()
+	handleRead(q)(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("read status = %d, want 200", rec.Code)
+	}
+
+	mreq := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	mrec := httptest.NewRecorder()
+	handleMetrics(q)(mrec, mreq)
+
+	var m map[string]any
+	if err := json.NewDecoder(mrec.Body).Decode(&m); err != nil {
+		t.Fatalf("decode metrics: %v", err)
+	}
+	for _, field := range []string{
+		"client_request_count", "busy_count",
+		"client_avg_latency_ms", "client_recent_avg_latency_ms",
+	} {
+		if _, ok := m[field]; !ok {
+			t.Errorf("metrics missing field %q", field)
+		}
+	}
+	if got := m["client_request_count"]; got != float64(1) {
+		t.Errorf("client_request_count = %v, want 1", got)
+	}
+	if got := m["busy_count"]; got != float64(0) {
+		t.Errorf("busy_count = %v, want 0", got)
+	}
+	if got, ok := m["client_recent_avg_latency_ms"].(float64); !ok || got <= 0 {
+		t.Errorf("client_recent_avg_latency_ms = %v, want > 0", m["client_recent_avg_latency_ms"])
+	}
+}
+
+func TestMetricsBusyExcludedFromLatency(t *testing.T) {
+	// queue size 1, fill the slot so the next request returns busy
+	plc := newPLCClient("127.0.0.1", 5007, mc.ModeBinary)
+	plc.conn = &mockConn{words: map[string]uint16{}}
+	q := newPLCQueue(plc, 1)
+	t.Cleanup(func() {
+		_ = q.Shutdown(context.Background())
+		q.Close()
+	})
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	go func() {
+		_, _ = q.work.Do(context.Background(), func() (any, error) {
+			close(started)
+			<-release
+			return nil, nil
+		})
+	}()
+	<-started
+	// fill queue buffer so next exec returns busy
+	q.work.jobs <- workJob{
+		ctx:     context.Background(),
+		execute: func() (any, error) { return nil, nil },
+		result:  make(chan workResult, 1),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100", nil)
+	rec := httptest.NewRecorder()
+	handleRead(q)(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", rec.Code)
+	}
+	close(release)
+
+	mreq := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	mrec := httptest.NewRecorder()
+	handleMetrics(q)(mrec, mreq)
+
+	var m map[string]any
+	if err := json.NewDecoder(mrec.Body).Decode(&m); err != nil {
+		t.Fatalf("decode metrics: %v", err)
+	}
+	if got := m["busy_count"]; got != float64(1) {
+		t.Errorf("busy_count = %v, want 1", got)
+	}
+	// busy request must not contribute to client latency average
+	if got := m["client_recent_avg_latency_ms"]; got != float64(0) {
+		t.Errorf("client_recent_avg_latency_ms = %v, want 0 (busy excluded)", got)
+	}
+}
+
 func waitForWorkQueueClosed(t *testing.T, queue *WorkQueue) {
 	t.Helper()
 	deadline := time.After(time.Second)

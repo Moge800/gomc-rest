@@ -164,7 +164,8 @@ func (q *PLCQueue) exec(ctx context.Context, fn func() (any, error)) (any, error
 	q.client.requests.Add(1)
 	start := time.Now()
 	value, err := q.work.Do(ctx, fn)
-	if _, isBusy := err.(*busyErr); isBusy {
+	var busyE *busyErr
+	if errors.As(err, &busyE) {
 		q.client.busyCount.Add(1)
 	} else {
 		q.client.recordLatency(time.Since(start).Nanoseconds())
