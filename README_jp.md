@@ -2,11 +2,11 @@
 
 [English README](README.md)
 
-`gomc-rest` は、三菱電機 PLC（MC プロトコル 3E / 4E フレーム）向けの小さな REST API サーバーです。HTTP クライアントから `D100` や `M0` のようなデバイス文字列を指定して読み書きでき、ワードデバイスは整数、ビットデバイスは真偽値として JSON に自動変換します。
+`gomc-rest` は、三菱電機 PLC（MC プロトコル 3E / 4E フレーム）向けの小さな REST API サーバー兼 HTTP ゲートウェイです。HTTP クライアントと PLC の間に入り、`D100.0`、`W100`、`M0` のようなデバイス文字列を指定した読み書きを仲介しつつ、ワードデバイスは整数、ビットデバイスは真偽値として JSON に自動変換します。
 
 PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使用します。HTTP サーバー部分は Go の標準ライブラリのみで実装されています。
 
-Python クライアントライブラリもあります: [gomc-rest-client (PyPI)](https://pypi.org/project/gomc-rest-client/)
+追加依存なしの Python クライアントライブラリもあります: [gomc-rest-client (PyPI)](https://pypi.org/project/gomc-rest-client/)
 
 ## 機能
 
