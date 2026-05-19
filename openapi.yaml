@@ -518,6 +518,168 @@ paths:
         "504":
           $ref: "#/components/responses/RequestTimeout"
 
+  /random-read:
+    post:
+      summary: Random read PLC device values
+      description: |
+        Read multiple non-contiguous word device addresses in a single MC Protocol request (command 0x0403).
+        `words` returns 16-bit unsigned values; `dwords` returns 32-bit unsigned values.
+        Only word devices (D, W, R, ZR, TN, STN, CN, Z, SW, SD) are supported.
+        Maximum 255 addresses per category. At least one of `words` or `dwords` must be non-empty.
+      operationId: randomRead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                words:
+                  type: array
+                  items:
+                    type: string
+                  description: "Word device addresses to read as 16-bit values (e.g. [\"D100\", \"D200\"])"
+                  maxItems: 255
+                dwords:
+                  type: array
+                  items:
+                    type: string
+                  description: "Word device addresses to read as 32-bit values (e.g. [\"D300\"])"
+                  maxItems: 255
+            example:
+              words: ["D100", "D200"]
+              dwords: ["D300"]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [words, dwords]
+                properties:
+                  words:
+                    type: array
+                    items:
+                      type: integer
+                    description: 16-bit unsigned values in the order of the request
+                  dwords:
+                    type: array
+                    items:
+                      type: integer
+                      format: int64
+                    description: 32-bit unsigned values in the order of the request
+              example:
+                words: [1234, 5678]
+                dwords: [123456]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/RequestEntityTooLarge"
+        "499":
+          $ref: "#/components/responses/RequestCanceled"
+        "502":
+          $ref: "#/components/responses/PLCError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "504":
+          $ref: "#/components/responses/RequestTimeout"
+
+  /random-write:
+    post:
+      summary: Random write PLC device values
+      description: |
+        Write multiple non-contiguous device addresses in one or two MC Protocol requests.
+        `words` and `dwords` use command 0x1402 (word/dword random write); `bits` uses command 0x1402 subcommand 0x0001 (bit random write).
+        Both commands are issued within a single serialized job.
+        `words` and `dwords` require word devices; `bits` requires bit devices.
+        Maximum 255 entries per array. At least one array must be non-empty.
+        Requires server not started with `-readonly`.
+      operationId: randomWrite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                words:
+                  type: array
+                  items:
+                    type: object
+                    required: [addr, value]
+                    properties:
+                      addr:
+                        type: string
+                        description: Word device address
+                      value:
+                        type: integer
+                        minimum: 0
+                        maximum: 65535
+                  maxItems: 255
+                dwords:
+                  type: array
+                  items:
+                    type: object
+                    required: [addr, value]
+                    properties:
+                      addr:
+                        type: string
+                        description: Word device address
+                      value:
+                        type: integer
+                        format: int64
+                        minimum: 0
+                        maximum: 4294967295
+                  maxItems: 255
+                bits:
+                  type: array
+                  items:
+                    type: object
+                    required: [addr, value]
+                    properties:
+                      addr:
+                        type: string
+                        description: Bit device address
+                      value:
+                        type: boolean
+                  maxItems: 255
+            example:
+              words:
+                - addr: "D100"
+                  value: 1234
+              dwords:
+                - addr: "D300"
+                  value: 65536
+              bits:
+                - addr: "M0"
+                  value: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/RequestEntityTooLarge"
+        "499":
+          $ref: "#/components/responses/RequestCanceled"
+        "502":
+          $ref: "#/components/responses/PLCError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "504":
+          $ref: "#/components/responses/RequestTimeout"
+
   /remote/run:
     post:
       summary: Remote RUN

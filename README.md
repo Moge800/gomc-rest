@@ -191,6 +191,8 @@ All successful write and remote-control operations return:
 | `GET` | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1`, `dword` optional and defaults to `false`, `sint` optional and defaults to `false` | `{"values":[100,200]}` or `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` required, `dword` optional and defaults to `false`, `sint` optional and defaults to `false`; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
+| `POST` | `/random-read` | body: `{"words":["D100","D200"],"dwords":["D300"]}` | `{"words":[100,200],"dwords":[300]}` |
+| `POST` | `/random-write` | body: `{"words":[{"addr":"D100","value":1}],"dwords":[{"addr":"D300","value":65536}],"bits":[{"addr":"M0","value":true}]}` | `{"ok":true}` |
 | `POST` | `/remote/run` | requires `-enable-remote`; query: `clear=0/1/2` optional, `force=true/false` optional | `{"ok":true}` |
 | `POST` | `/remote/stop` | requires `-enable-remote`; none | `{"ok":true}` |
 | `POST` | `/remote/pause` | requires `-enable-remote`; query: `force=true/false` optional | `{"ok":true}` |
@@ -205,6 +207,8 @@ Notes:
 - Word devices require integer values in the range `0..65535`. Bit devices require boolean values.
 - When `dword=true`, each value is an unsigned 32-bit integer in the range `0..4294967295`. The low 16 bits are stored in the register at `addr` and the high 16 bits in the next register (`addr+1`). Only word devices support `dword=true`. With `dword=true`, `count` must be `512` or less and `values` must contain `512` items or less (so that the actual word count sent to the PLC does not exceed `1024`).
 - When `sint=true`, values are interpreted as signed integers. For word devices the range is `-32768..32767`; for `dword=true` the range is `-2147483648..2147483647`. Only word devices support `sint=true`. The PLC register bits are unchanged — `sint` only affects how values are converted between JSON and the 16-bit register representation.
+- `/random-read` accepts `words` and `dwords` arrays of device address strings. Both default to empty; at least one must be non-empty. Only word devices (`D`, `W`, `R`, etc.) are allowed. Returns `{"words":[...],"dwords":[...]}` where word values are integers (`0..65535`) and dword values are unsigned 64-bit integers.
+- `/random-write` accepts `words`, `dwords`, and `bits` arrays. Each entry is `{"addr":"...","value":...}`. `words` and `dwords` require word devices; `bits` requires bit devices. Internally calls `RandomWrite` for words/dwords and `RandomWriteBits` for bits within one serialized job. Maximum 255 entries per array.
 - `/remote/*` endpoints are disabled by default and return `403 forbidden` unless the server is started with `-enable-remote`. This is separate from read-only mode.
 - When read-only mode is enabled, POST operations on `/write` and `/remote/*` return `403 forbidden`. Read-only mode is a safety aid, not a replacement for network isolation, authentication, authorization, firewall rules, or PLC-side protection.
 - Boolean query flags (`dword`, `sint`, `force`) are enabled only when the query string value is exactly `true`.
@@ -294,6 +298,15 @@ curl -X POST "http://localhost:8080/write?addr=D100&sint=true" \
 curl -X POST "http://localhost:8080/write?addr=M0" \
   -H "Content-Type: application/json" \
   -d '{"values":[true,false]}'
+
+# Random read/write — multiple non-contiguous addresses in one request
+curl -X POST "http://localhost:8080/random-read" \
+  -H "Content-Type: application/json" \
+  -d '{"words":["D100","D200"],"dwords":["D300"]}'
+
+curl -X POST "http://localhost:8080/random-write" \
+  -H "Content-Type: application/json" \
+  -d '{"words":[{"addr":"D100","value":10},{"addr":"D200","value":20}],"bits":[{"addr":"M0","value":true}]}'
 
 # Remote-control endpoints require -enable-remote at startup
 curl -X POST "http://localhost:8080/remote/run?clear=0&force=false"

@@ -1271,6 +1271,8 @@ func newTestMux(t *testing.T) *http.ServeMux {
 	mux.HandleFunc("/health", handleHealth(q))
 	mux.HandleFunc("/read", handleRead(q))
 	mux.HandleFunc("/write", handleWrite(q, false))
+	mux.HandleFunc("/random-read", handleRandomRead(q))
+	mux.HandleFunc("/random-write", handleRandomWrite(q, false))
 	mux.HandleFunc("/remote/run", handleRemoteRun(q, false, true))
 	mux.HandleFunc("/remote/stop", handleRemoteStop(q, false, true))
 	mux.HandleFunc("/remote/pause", handleRemotePause(q, false, true))
