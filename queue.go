@@ -196,13 +196,13 @@ func (q *PLCQueue) ReadWords(ctx context.Context, device string, start, count in
 	t := time.Now()
 	value, err := q.exec(ctx, func() (any, error) {
 		var words []uint16
-		plcStart := time.Now()
 		doErr := q.plc.do(func(c plcConnection) error {
+			plcStart := time.Now()
 			var readErr error
 			words, readErr = c.ReadWords(device, start, count)
+			writePLCLatency(ctx, time.Since(plcStart))
 			return readErr
 		})
-		writePLCLatency(ctx, time.Since(plcStart))
 		return words, doErr
 	})
 	logPLCOp(device+strconv.Itoa(start), time.Since(t), err)
@@ -216,13 +216,13 @@ func (q *PLCQueue) ReadBits(ctx context.Context, device string, start, count int
 	t := time.Now()
 	value, err := q.exec(ctx, func() (any, error) {
 		var bits []bool
-		plcStart := time.Now()
 		doErr := q.plc.do(func(c plcConnection) error {
+			plcStart := time.Now()
 			var readErr error
 			bits, readErr = c.ReadBits(device, start, count)
+			writePLCLatency(ctx, time.Since(plcStart))
 			return readErr
 		})
-		writePLCLatency(ctx, time.Since(plcStart))
 		return bits, doErr
 	})
 	logPLCOp(device+strconv.Itoa(start), time.Since(t), err)
@@ -235,11 +235,12 @@ func (q *PLCQueue) ReadBits(ctx context.Context, device string, start, count int
 func (q *PLCQueue) WriteWords(ctx context.Context, device string, start int, values []uint16) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {
-		plcStart := time.Now()
 		doErr := q.plc.do(func(c plcConnection) error {
-			return c.WriteWords(device, start, values)
+			plcStart := time.Now()
+			writeErr := c.WriteWords(device, start, values)
+			writePLCLatency(ctx, time.Since(plcStart))
+			return writeErr
 		})
-		writePLCLatency(ctx, time.Since(plcStart))
 		return nil, doErr
 	})
 	logPLCOp(device+strconv.Itoa(start), time.Since(t), err)
@@ -249,11 +250,12 @@ func (q *PLCQueue) WriteWords(ctx context.Context, device string, start int, val
 func (q *PLCQueue) WriteBits(ctx context.Context, device string, start int, values []bool) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {
-		plcStart := time.Now()
 		doErr := q.plc.do(func(c plcConnection) error {
-			return c.WriteBits(device, start, values)
+			plcStart := time.Now()
+			writeErr := c.WriteBits(device, start, values)
+			writePLCLatency(ctx, time.Since(plcStart))
+			return writeErr
 		})
-		writePLCLatency(ctx, time.Since(plcStart))
 		return nil, doErr
 	})
 	logPLCOp(device+strconv.Itoa(start), time.Since(t), err)
@@ -264,16 +266,16 @@ func (q *PLCQueue) ReadWordBit(ctx context.Context, device string, addr, bit int
 	t := time.Now()
 	value, err := q.exec(ctx, func() (any, error) {
 		var result bool
-		plcStart := time.Now()
 		doErr := q.plc.do(func(c plcConnection) error {
+			plcStart := time.Now()
 			words, readErr := c.ReadWords(device, addr, 1)
+			writePLCLatency(ctx, time.Since(plcStart))
 			if readErr != nil {
 				return readErr
 			}
 			result = (words[0]>>uint(bit))&1 == 1
 			return nil
 		})
-		writePLCLatency(ctx, time.Since(plcStart))
 		return result, doErr
 	})
 	logPLCOp(device+strconv.Itoa(addr)+"."+strconv.Itoa(bit), time.Since(t), err)
@@ -286,8 +288,8 @@ func (q *PLCQueue) ReadWordBit(ctx context.Context, device string, addr, bit int
 func (q *PLCQueue) WriteWordBit(ctx context.Context, device string, addr, bit int, value bool) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {
-		plcStart := time.Now()
 		doErr := q.plc.do(func(c plcConnection) error {
+			plcStart := time.Now()
 			words, err := c.ReadWords(device, addr, 1)
 			if err != nil {
 				return err
@@ -297,9 +299,10 @@ func (q *PLCQueue) WriteWordBit(ctx context.Context, device string, addr, bit in
 			} else {
 				words[0] &^= 1 << uint(bit)
 			}
-			return c.WriteWords(device, addr, words)
+			writeErr := c.WriteWords(device, addr, words)
+			writePLCLatency(ctx, time.Since(plcStart))
+			return writeErr
 		})
-		writePLCLatency(ctx, time.Since(plcStart))
 		return nil, doErr
 	})
 	logPLCOp(device+strconv.Itoa(addr)+"."+strconv.Itoa(bit), time.Since(t), err)
@@ -309,11 +312,12 @@ func (q *PLCQueue) WriteWordBit(ctx context.Context, device string, addr, bit in
 func (q *PLCQueue) RemoteRun(ctx context.Context, clear int, force bool) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {
-		plcStart := time.Now()
 		doErr := q.plc.do(func(c plcConnection) error {
-			return c.RemoteRun(clear, force)
+			plcStart := time.Now()
+			runErr := c.RemoteRun(clear, force)
+			writePLCLatency(ctx, time.Since(plcStart))
+			return runErr
 		})
-		writePLCLatency(ctx, time.Since(plcStart))
 		return nil, doErr
 	})
 	logPLCOp("remote_run", time.Since(t), err)
@@ -323,11 +327,12 @@ func (q *PLCQueue) RemoteRun(ctx context.Context, clear int, force bool) error {
 func (q *PLCQueue) RemoteStop(ctx context.Context) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {
-		plcStart := time.Now()
 		doErr := q.plc.do(func(c plcConnection) error {
-			return c.RemoteStop()
+			plcStart := time.Now()
+			stopErr := c.RemoteStop()
+			writePLCLatency(ctx, time.Since(plcStart))
+			return stopErr
 		})
-		writePLCLatency(ctx, time.Since(plcStart))
 		return nil, doErr
 	})
 	logPLCOp("remote_stop", time.Since(t), err)
@@ -337,11 +342,12 @@ func (q *PLCQueue) RemoteStop(ctx context.Context) error {
 func (q *PLCQueue) RemotePause(ctx context.Context, force bool) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {
-		plcStart := time.Now()
 		doErr := q.plc.do(func(c plcConnection) error {
-			return c.RemotePause(force)
+			plcStart := time.Now()
+			pauseErr := c.RemotePause(force)
+			writePLCLatency(ctx, time.Since(plcStart))
+			return pauseErr
 		})
-		writePLCLatency(ctx, time.Since(plcStart))
 		return nil, doErr
 	})
 	logPLCOp("remote_pause", time.Since(t), err)
@@ -351,11 +357,12 @@ func (q *PLCQueue) RemotePause(ctx context.Context, force bool) error {
 func (q *PLCQueue) RemoteLatchClear(ctx context.Context) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {
-		plcStart := time.Now()
 		doErr := q.plc.do(func(c plcConnection) error {
-			return c.RemoteLatchClear()
+			plcStart := time.Now()
+			clearErr := c.RemoteLatchClear()
+			writePLCLatency(ctx, time.Since(plcStart))
+			return clearErr
 		})
-		writePLCLatency(ctx, time.Since(plcStart))
 		return nil, doErr
 	})
 	logPLCOp("remote_latch_clear", time.Since(t), err)
