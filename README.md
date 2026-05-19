@@ -187,7 +187,7 @@ All successful write and remote-control operations return:
 | `GET` | `/openapi.yaml` | none | OpenAPI 3.1 specification (YAML) |
 | `GET` | `/version` | none | `{"version":"v0.9.0"}` or `{"version":"dev"}` for local builds |
 | `GET` | `/info` | none | `{"version":"v0.9.0","gomcprotocol_version":"v0.3.0","host":"192.168.0.1","port":5007,"frame":"3e","transport":"tcp","mode":"binary","listen_addrs":["192.168.1.10:8080"],"readonly":false,"enable_remote":false}` |
-| `GET` | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"recent_avg_latency_ms":0,"queue_length":0}` |
+| `GET` | `/metrics` | none | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"recent_avg_latency_ms":0,"queue_length":0,"client_request_count":0,"busy_count":0,"client_avg_latency_ms":0,"client_recent_avg_latency_ms":0}` |
 | `GET` | `/health` | none | `{"plc_status":"ok","connected":true}` or `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` required, `count` optional and defaults to `1`, `dword` optional and defaults to `false`, `sint` optional and defaults to `false` | `{"values":[100,200]}` or `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` required, `dword` optional and defaults to `false`, `sint` optional and defaults to `false`; body: `{"values":[1,2,3]}` or `{"values":[true,false]}` | `{"ok":true}` |
@@ -210,6 +210,7 @@ Notes:
 - Boolean query flags (`dword`, `sint`, `force`) are enabled only when the query string value is exactly `true`.
 - `GET /health` always returns HTTP `200`, even when the PLC is disconnected.
 - `/remote/reset` clears the TCP connection because the PLC closes it after reset.
+- `/metrics` PLC fields (`request_count`, `avg_latency_ms`, `recent_avg_latency_ms`) measure only the PLC wire time. Client fields (`client_request_count`, `client_avg_latency_ms`, `client_recent_avg_latency_ms`) measure the full round-trip including queue wait time. `busy_count` counts requests rejected because the queue was full; these are excluded from the client latency averages.
 
 ## Device Addressing
 

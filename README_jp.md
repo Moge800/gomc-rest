@@ -187,7 +187,7 @@ go build -o gomc-rest .
 | `GET` | `/openapi.yaml` | なし | OpenAPI 3.1 仕様書（YAML） |
 | `GET` | `/version` | なし | `{"version":"v0.9.0"}` またはローカルビルドでは `{"version":"dev"}` |
 | `GET` | `/info` | なし | `{"version":"v0.9.0","gomcprotocol_version":"v0.3.0","host":"192.168.0.1","port":5007,"frame":"3e","transport":"tcp","mode":"binary","listen_addrs":["192.168.1.10:8080"],"readonly":false,"enable_remote":false}` |
-| `GET` | `/metrics` | なし | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"recent_avg_latency_ms":0,"queue_length":0}` |
+| `GET` | `/metrics` | なし | `{"request_count":0,"reconnect_count":0,"plc_error_count":0,"avg_latency_ms":0,"recent_avg_latency_ms":0,"queue_length":0,"client_request_count":0,"busy_count":0,"client_avg_latency_ms":0,"client_recent_avg_latency_ms":0}` |
 | `GET` | `/health` | なし | `{"plc_status":"ok","connected":true}` または `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1`、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false` | `{"values":[100,200]}` または `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` 必須、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false`、body: `{"values":[1,2,3]}` または `{"values":[true,false]}` | `{"ok":true}` |
@@ -210,6 +210,7 @@ go build -o gomc-rest .
 - ブール型 query フラグ（`dword`、`sint`、`force`）は query 文字列の値が厳密に `true` のときだけ有効です。
 - `GET /health` は PLC 未接続時でも常に HTTP `200` を返します。
 - `/remote/reset` は PLC 側で TCP 接続が閉じられるため、実行後に接続をクリアします。
+- `/metrics` の PLC 系フィールド（`request_count`、`avg_latency_ms`、`recent_avg_latency_ms`）は PLC との通信時間のみを計測します。クライアント系フィールド（`client_request_count`、`client_avg_latency_ms`、`client_recent_avg_latency_ms`）はキュー待ち時間を含むクライアント視点の往復時間を計測します。`busy_count` はキュー満杯で弾かれたリクエスト数で、クライアントレイテンシーの平均には含みません。
 
 ## デバイスアドレス
 
