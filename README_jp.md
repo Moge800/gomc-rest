@@ -191,6 +191,8 @@ go build -o gomc-rest .
 | `GET` | `/health` | なし | `{"plc_status":"ok","connected":true}` または `{"plc_status":"disconnected","connected":false}` |
 | `GET` | `/read` | query: `addr` 必須、`count` は任意でデフォルト `1`、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false` | `{"values":[100,200]}` または `{"values":[true,false]}` |
 | `POST` | `/write` | query: `addr` 必須、`dword` は任意でデフォルト `false`、`sint` は任意でデフォルト `false`、body: `{"values":[1,2,3]}` または `{"values":[true,false]}` | `{"ok":true}` |
+| `POST` | `/random-read` | body: `{"words":["D100","D200"],"dwords":["D300"]}` | `{"words":[100,200],"dwords":[300]}` |
+| `POST` | `/random-write` | body: `{"words":[{"addr":"D100","value":1}],"dwords":[{"addr":"D300","value":65536}],"bits":[{"addr":"M0","value":true}]}` | `{"ok":true}` |
 | `POST` | `/remote/run` | `-enable-remote` が必要。query: `clear=0/1/2` 任意、`force=true/false` 任意 | `{"ok":true}` |
 | `POST` | `/remote/stop` | `-enable-remote` が必要。なし | `{"ok":true}` |
 | `POST` | `/remote/pause` | `-enable-remote` が必要。query: `force=true/false` 任意 | `{"ok":true}` |
@@ -205,6 +207,8 @@ go build -o gomc-rest .
 - ワードデバイスには `0..65535` の整数配列、ビットデバイスには真偽値配列を指定します。
 - `dword=true` を指定すると、各値は符号なし 32 ビット整数（`0..4294967295`）として扱われます。下位 16 ビットは `addr` のレジスタに、上位 16 ビットは次のレジスタ（`addr+1`）に格納されます。`dword=true` はワードデバイスのみ対応しています。`dword=true` の場合、`count` は `512` 以下、`values` の要素数も `512` 以下にしてください（PLC へ送る語数が `1024` を超えないようにするため）。
 - `sint=true` を指定すると、値を符号付き整数として扱います。ワードデバイスは `-32768..32767`、`dword=true` との組み合わせでは `-2147483648..2147483647` の範囲になります。ビットデバイスには使用できません。PLC レジスタのビット列は変わらず、JSON との変換方式のみが変わります。
+- `/random-read` は `words`（ワードデバイスのアドレス文字列配列）と `dwords`（同じくダブルワード読み取り用）を受け付けます。どちらかが非空であれば可。ワードデバイス（`D`、`W`、`R` など）のみ対応。レスポンスは `{"words":[...],"dwords":[...]}` で、word 値は整数（`0..65535`）、dword 値は符号なし 32 ビット整数（`0..4294967295`）です。
+- `/random-write` は `words`、`dwords`、`bits` の配列を受け付けます。各要素は `{"addr":"...","value":...}` 形式。`words`・`dwords` にはワードデバイス、`bits` にはビットデバイスのみ指定可能。内部で `RandomWrite`（words/dwords）と `RandomWriteBits`（bits）を1つの直列ジョブとして実行。各配列の上限は 255 件。
 - `/remote/*` エンドポイントはデフォルトで無効です。`-enable-remote` なしで呼び出すと `403 forbidden` になります。読み取り専用モードとは独立した設定です。
 - 読み取り専用モードでは `/write` と `/remote/*` の POST 操作は `403 forbidden` になります。読み取り専用モードは安全補助であり、ネットワーク分離、認証、認可、ファイアウォール、PLC 側保護の代替ではありません。
 - ブール型 query フラグ（`dword`、`sint`、`force`）は query 文字列の値が厳密に `true` のときだけ有効です。
@@ -294,6 +298,15 @@ curl -X POST "http://localhost:8080/write?addr=D100&sint=true" \
 curl -X POST "http://localhost:8080/write?addr=M0" \
   -H "Content-Type: application/json" \
   -d '{"values":[true,false]}'
+
+# ランダム読み書き — 非連続アドレスを1リクエストで処理
+curl -X POST "http://localhost:8080/random-read" \
+  -H "Content-Type: application/json" \
+  -d '{"words":["D100","D200"],"dwords":["D300"]}'
+
+curl -X POST "http://localhost:8080/random-write" \
+  -H "Content-Type: application/json" \
+  -d '{"words":[{"addr":"D100","value":10},{"addr":"D200","value":20}],"bits":[{"addr":"M0","value":true}]}'
 
 # リモート操作は起動時に -enable-remote が必要
 curl -X POST "http://localhost:8080/remote/run?clear=0&force=false"

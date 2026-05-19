@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	mc "github.com/moge800/gomcprotocol"
 )
 
 var errQueueClosed = errors.New("PLC communication queue is closed")
@@ -374,6 +376,61 @@ func (q *PLCQueue) RemoteReset(ctx context.Context) error {
 		return nil, q.plc.doReset(ctx)
 	})
 	logPLCOp("remote_reset", time.Since(t), err)
+	return err
+}
+
+const maxRandomCount = 255
+
+func (q *PLCQueue) RandomRead(ctx context.Context, words, dwords []mc.DeviceAddr) ([]uint16, []uint32, error) {
+	t := time.Now()
+	type result struct {
+		words  []uint16
+		dwords []uint32
+	}
+	value, err := q.exec(ctx, func() (any, error) {
+		var r result
+		doErr := q.plc.do(func(c plcConnection) error {
+			plcStart := time.Now()
+			var readErr error
+			r.words, r.dwords, readErr = c.RandomRead(words, dwords)
+			writePLCLatency(ctx, time.Since(plcStart))
+			return readErr
+		})
+		return r, doErr
+	})
+	logPLCOp("random_read", time.Since(t), err)
+	if err != nil {
+		return nil, nil, err
+	}
+	r := value.(result)
+	return r.words, r.dwords, nil
+}
+
+func (q *PLCQueue) RandomWrite(ctx context.Context,
+	words []mc.DeviceAddr, wordVals []uint16,
+	dwords []mc.DeviceAddr, dwordVals []uint32,
+	bits []mc.DeviceAddr, bitVals []bool,
+) error {
+	t := time.Now()
+	_, err := q.exec(ctx, func() (any, error) {
+		doErr := q.plc.do(func(c plcConnection) error {
+			plcStart := time.Now()
+			defer func() { writePLCLatency(ctx, time.Since(plcStart)) }()
+			if len(words)+len(dwords) > 0 {
+				if err := c.RandomWrite(words, wordVals, dwords, dwordVals); err != nil {
+					return err
+				}
+			}
+			if len(bits) > 0 {
+				if err := c.RandomWriteBits(bits, bitVals); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		return nil, doErr
+	})
+	logPLCOp("random_write", time.Since(t), err)
 	return err
 }
 

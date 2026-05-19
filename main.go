@@ -62,6 +62,8 @@ func main() {
 	mux.HandleFunc("/health", handleHealth(plcQueue))
 	mux.HandleFunc("/read", handleRead(plcQueue))
 	mux.HandleFunc("/write", handleWrite(plcQueue, cfg.ReadOnly))
+	mux.HandleFunc("/random-read", handleRandomRead(plcQueue))
+	mux.HandleFunc("/random-write", handleRandomWrite(plcQueue, cfg.ReadOnly))
 	mux.HandleFunc("/remote/run", handleRemoteRun(plcQueue, cfg.ReadOnly, cfg.EnableRemote))
 	mux.HandleFunc("/remote/stop", handleRemoteStop(plcQueue, cfg.ReadOnly, cfg.EnableRemote))
 	mux.HandleFunc("/remote/pause", handleRemotePause(plcQueue, cfg.ReadOnly, cfg.EnableRemote))
