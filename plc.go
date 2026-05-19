@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -160,7 +161,7 @@ func (p *PLCClient) close() {
 
 // doReset is like do but always clears the connection afterwards (RemoteReset
 // closes the TCP connection on the PLC side).
-func (p *PLCClient) doReset() error {
+func (p *PLCClient) doReset(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -175,9 +176,11 @@ func (p *PLCClient) doReset() error {
 	}
 
 	p.metrics.requests.Add(1)
-	start := time.Now()
+	plcStart := time.Now()
 	err := p.conn.RemoteReset()
-	p.metrics.recordLatency(time.Since(start).Nanoseconds())
+	elapsed := time.Since(plcStart)
+	p.metrics.recordLatency(elapsed.Nanoseconds())
+	writePLCLatency(ctx, elapsed)
 	p.conn = nil // PLC closes connection on reset regardless of error
 
 	var connErr *mc.MCProtocolConnectionError

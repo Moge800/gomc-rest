@@ -257,7 +257,12 @@ paths:
   /metrics:
     get:
       summary: Runtime metrics
-      description: Returns cumulative counters and average latency since process start.
+      description: |
+        Returns cumulative counters and latency averages since process start.
+
+        PLC fields (`request_count`, `avg_latency_ms`, `recent_avg_latency_ms`) measure only the PLC wire time.
+        Client fields (`client_request_count`, `client_avg_latency_ms`, `client_recent_avg_latency_ms`) measure the full round-trip including queue wait time.
+        `busy_count` counts requests rejected because the queue was full; these are excluded from client latency averages.
       operationId: getMetrics
       responses:
         "200":
@@ -273,6 +278,10 @@ paths:
                   - avg_latency_ms
                   - recent_avg_latency_ms
                   - queue_length
+                  - client_request_count
+                  - busy_count
+                  - client_avg_latency_ms
+                  - client_recent_avg_latency_ms
                 properties:
                   request_count:
                     type: integer
@@ -289,17 +298,35 @@ paths:
                   avg_latency_ms:
                     type: number
                     format: double
-                    description: Average PLC round-trip latency since process start, in milliseconds (2 decimal places)
+                    description: Average PLC wire latency since process start, in milliseconds (2 decimal places)
                     example: 8.33
                   recent_avg_latency_ms:
                     type: number
                     format: double
-                    description: Average PLC round-trip latency for the most recent 100 requests, in milliseconds (2 decimal places)
+                    description: Average PLC wire latency for the most recent 100 requests, in milliseconds (2 decimal places)
                     example: 7.12
                   queue_length:
                     type: integer
                     description: Current number of pending operations in the queue
                     example: 0
+                  client_request_count:
+                    type: integer
+                    description: Total HTTP requests to PLC endpoints (including busy rejections)
+                    example: 1300
+                  busy_count:
+                    type: integer
+                    description: Requests rejected because the queue was full
+                    example: 12
+                  client_avg_latency_ms:
+                    type: number
+                    format: double
+                    description: Average client-visible latency (queue wait + PLC) since process start, excluding busy rejections, in milliseconds (2 decimal places)
+                    example: 32.5
+                  client_recent_avg_latency_ms:
+                    type: number
+                    format: double
+                    description: Average client-visible latency for the most recent 100 non-busy requests, in milliseconds (2 decimal places)
+                    example: 28.1
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
 
