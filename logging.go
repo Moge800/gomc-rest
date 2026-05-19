@@ -4,11 +4,38 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	mc "github.com/moge800/gomcprotocol"
 )
+
+type plcLatencyKey struct{}
+
+// withPLCLatency injects a *int64 into the request context so queue methods
+// can record the PLC wire time for logRequests to include in the request log.
+func withPLCLatency(r *http.Request) *http.Request {
+	var ns int64
+	return r.WithContext(context.WithValue(r.Context(), plcLatencyKey{}, &ns))
+}
+
+// writePLCLatency stores PLC wire time in the context pointer set by withPLCLatency.
+func writePLCLatency(ctx context.Context, d time.Duration) {
+	if p, ok := ctx.Value(plcLatencyKey{}).(*int64); ok {
+		atomic.StoreInt64(p, d.Nanoseconds())
+	}
+}
+
+func plcLatencyMs(ctx context.Context) (float64, bool) {
+	if p, ok := ctx.Value(plcLatencyKey{}).(*int64); ok {
+		if ns := atomic.LoadInt64(p); ns > 0 {
+			return math.Round(float64(ns)/1e6*100) / 100, true
+		}
+	}
+	return 0, false
+}
 
 // teeHandler fans out log records to multiple handlers.
 type teeHandler struct {
@@ -110,8 +137,10 @@ func recoverPanic(h http.Handler) http.Handler {
 
 // logRequests wraps h and logs each request via slog.
 // 2xx → Info, 4xx → Warn, 5xx → Error.
+// plc_latency_ms is added when the handler performed a PLC operation.
 func logRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r = withPLCLatency(r)
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		h.ServeHTTP(rec, r)
@@ -121,13 +150,17 @@ func logRequests(h http.Handler) http.Handler {
 		} else if rec.status >= 400 {
 			level = slog.LevelWarn
 		}
-		slog.Log(r.Context(), level, "request",
+		attrs := []any{
 			"remote", r.RemoteAddr,
 			"method", r.Method,
 			"path", r.URL.Path,
 			"query", r.URL.RawQuery,
 			"status", rec.status,
 			"duration", time.Since(start).Round(time.Millisecond),
-		)
+		}
+		if ms, ok := plcLatencyMs(r.Context()); ok {
+			attrs = append(attrs, "plc_latency_ms", ms)
+		}
+		slog.Log(r.Context(), level, "request", attrs...)
 	})
 }
