@@ -16,6 +16,9 @@ type plcConnection interface {
 	WriteWords(device string, start int, values []uint16) error
 	ReadBits(device string, start, count int) ([]bool, error)
 	WriteBits(device string, start int, values []bool) error
+	RandomRead(words, dwords []mc.DeviceAddr) ([]uint16, []uint32, error)
+	RandomWrite(words []mc.DeviceAddr, wordVals []uint16, dwords []mc.DeviceAddr, dwordVals []uint32) error
+	RandomWriteBits(devices []mc.DeviceAddr, values []bool) error
 	RemoteRun(clearMode int, force bool) error
 	RemoteStop() error
 	RemotePause(force bool) error

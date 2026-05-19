@@ -618,6 +618,189 @@ func handleRemoteLatchClear(plc *PLCQueue, readonly, enableRemote bool) http.Han
 	}
 }
 
+// POST /random-read   body: {"words":["D100","D200"],"dwords":["D300"]}
+func handleRandomRead(plc *PLCQueue) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var body struct {
+			Words  []string `json:"words"`
+			Dwords []string `json:"dwords"`
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxWriteBody)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				writeErr(w, http.StatusRequestEntityTooLarge, "bad_request", "body must not be larger than "+strconv.FormatInt(maxBytesErr.Limit, 10)+" bytes")
+				return
+			}
+			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+			return
+		}
+		if len(body.Words)+len(body.Dwords) == 0 {
+			writeErr(w, http.StatusBadRequest, "bad_request", "words and dwords must not both be empty")
+			return
+		}
+		if len(body.Words) > maxRandomCount || len(body.Dwords) > maxRandomCount {
+			writeErr(w, http.StatusBadRequest, "bad_request", "each array must contain "+strconv.Itoa(maxRandomCount)+" items or less")
+			return
+		}
+		parseWordAddr := func(s string) (mc.DeviceAddr, bool) {
+			pa, err := parseAddr(s)
+			if err != nil {
+				writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+				return mc.DeviceAddr{}, false
+			}
+			if pa.Bit >= 0 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "bit suffix not allowed: "+s)
+				return mc.DeviceAddr{}, false
+			}
+			if !isWordDevice(pa.Device) {
+				writeErr(w, http.StatusBadRequest, "bad_request", "only word devices are supported, got: "+s)
+				return mc.DeviceAddr{}, false
+			}
+			return pa.DeviceAddr, true
+		}
+		wordAddrs := make([]mc.DeviceAddr, len(body.Words))
+		for i, s := range body.Words {
+			da, ok := parseWordAddr(s)
+			if !ok {
+				return
+			}
+			wordAddrs[i] = da
+		}
+		dwordAddrs := make([]mc.DeviceAddr, len(body.Dwords))
+		for i, s := range body.Dwords {
+			da, ok := parseWordAddr(s)
+			if !ok {
+				return
+			}
+			dwordAddrs[i] = da
+		}
+		wordVals, dwordVals, err := plc.RandomRead(r.Context(), wordAddrs, dwordAddrs)
+		if err != nil {
+			writePLCErr(w, err)
+			return
+		}
+		wordInts := make([]int, len(wordVals))
+		for i, v := range wordVals {
+			wordInts[i] = int(v)
+		}
+		dwordInts := make([]int64, len(dwordVals))
+		for i, v := range dwordVals {
+			dwordInts[i] = int64(v)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"words": wordInts, "dwords": dwordInts})
+	}
+}
+
+// POST /random-write   body: {"words":[{"addr":"D100","value":1}],"dwords":[...],"bits":[{"addr":"M0","value":true}]}
+func handleRandomWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
+		if !requireWritable(w, readonly) {
+			return
+		}
+		var body struct {
+			Words []struct {
+				Addr  string `json:"addr"`
+				Value uint16 `json:"value"`
+			} `json:"words"`
+			Dwords []struct {
+				Addr  string `json:"addr"`
+				Value uint32 `json:"value"`
+			} `json:"dwords"`
+			Bits []struct {
+				Addr  string `json:"addr"`
+				Value bool   `json:"value"`
+			} `json:"bits"`
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxWriteBody)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				writeErr(w, http.StatusRequestEntityTooLarge, "bad_request", "body must not be larger than "+strconv.FormatInt(maxBytesErr.Limit, 10)+" bytes")
+				return
+			}
+			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+			return
+		}
+		if len(body.Words)+len(body.Dwords)+len(body.Bits) == 0 {
+			writeErr(w, http.StatusBadRequest, "bad_request", "words, dwords, and bits must not all be empty")
+			return
+		}
+		if len(body.Words) > maxRandomCount || len(body.Dwords) > maxRandomCount || len(body.Bits) > maxRandomCount {
+			writeErr(w, http.StatusBadRequest, "bad_request", "each array must contain "+strconv.Itoa(maxRandomCount)+" items or less")
+			return
+		}
+		wordAddrs := make([]mc.DeviceAddr, len(body.Words))
+		wordVals := make([]uint16, len(body.Words))
+		for i, e := range body.Words {
+			pa, err := parseAddr(e.Addr)
+			if err != nil {
+				writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+				return
+			}
+			if pa.Bit >= 0 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "bit suffix not allowed: "+e.Addr)
+				return
+			}
+			if !isWordDevice(pa.Device) {
+				writeErr(w, http.StatusBadRequest, "bad_request", "words must be word devices, got: "+e.Addr)
+				return
+			}
+			wordAddrs[i] = pa.DeviceAddr
+			wordVals[i] = e.Value
+		}
+		dwordAddrs := make([]mc.DeviceAddr, len(body.Dwords))
+		dwordVals := make([]uint32, len(body.Dwords))
+		for i, e := range body.Dwords {
+			pa, err := parseAddr(e.Addr)
+			if err != nil {
+				writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+				return
+			}
+			if pa.Bit >= 0 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "bit suffix not allowed: "+e.Addr)
+				return
+			}
+			if !isWordDevice(pa.Device) {
+				writeErr(w, http.StatusBadRequest, "bad_request", "dwords must be word devices, got: "+e.Addr)
+				return
+			}
+			dwordAddrs[i] = pa.DeviceAddr
+			dwordVals[i] = e.Value
+		}
+		bitAddrs := make([]mc.DeviceAddr, len(body.Bits))
+		bitVals := make([]bool, len(body.Bits))
+		for i, e := range body.Bits {
+			pa, err := parseAddr(e.Addr)
+			if err != nil {
+				writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+				return
+			}
+			if pa.Bit >= 0 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "bit suffix not allowed: "+e.Addr)
+				return
+			}
+			if isWordDevice(pa.Device) {
+				writeErr(w, http.StatusBadRequest, "bad_request", "bits must be bit devices, got: "+e.Addr)
+				return
+			}
+			bitAddrs[i] = pa.DeviceAddr
+			bitVals[i] = e.Value
+		}
+		if err := plc.RandomWrite(r.Context(), wordAddrs, wordVals, dwordAddrs, dwordVals, bitAddrs, bitVals); err != nil {
+			writePLCErr(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	}
+}
+
 // POST /remote/reset
 func handleRemoteReset(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

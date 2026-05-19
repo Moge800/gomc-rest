@@ -573,6 +573,20 @@ func (m *mockConn) RemotePause(_ bool) error                           { return 
 func (m *mockConn) RemoteLatchClear() error                            { return nil }
 func (m *mockConn) RemoteReset() error                                 { return nil }
 func (m *mockConn) Close() error                                       { return nil }
+func (m *mockConn) RandomRead(words, dwords []mc.DeviceAddr) ([]uint16, []uint32, error) {
+	wVals := make([]uint16, len(words))
+	for i, da := range words {
+		wVals[i] = m.words[da.Device+strconv.Itoa(da.Addr)]
+	}
+	return wVals, make([]uint32, len(dwords)), nil
+}
+func (m *mockConn) RandomWrite(words []mc.DeviceAddr, wordVals []uint16, _ []mc.DeviceAddr, _ []uint32) error {
+	for i, da := range words {
+		m.words[da.Device+strconv.Itoa(da.Addr)] = wordVals[i]
+	}
+	return nil
+}
+func (m *mockConn) RandomWriteBits(_ []mc.DeviceAddr, _ []bool) error { return nil }
 
 func newMockPLCQueue(t *testing.T, words map[string]uint16) *PLCQueue {
 	t.Helper()
@@ -1440,6 +1454,118 @@ func TestMetricsBusyExcludedFromLatency(t *testing.T) {
 	if got := m["client_recent_avg_latency_ms"]; got != float64(0) {
 		t.Errorf("client_recent_avg_latency_ms = %v, want 0 (busy excluded)", got)
 	}
+}
+
+func TestHandleRandomRead(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{"D100": 1234, "D200": 5678})
+
+	cases := []struct {
+		name       string
+		body       string
+		wantStatus int
+	}{
+		{"empty body", `{}`, http.StatusBadRequest},
+		{"both empty arrays", `{"words":[],"dwords":[]}`, http.StatusBadRequest},
+		{"bit device in words", `{"words":["M0"]}`, http.StatusBadRequest},
+		{"bit suffix", `{"words":["D100.0"]}`, http.StatusBadRequest},
+		{"invalid addr", `{"words":["ZZZ0"]}`, http.StatusBadRequest},
+		{"ok words only", `{"words":["D100","D200"]}`, http.StatusOK},
+		{"ok dwords only", `{"dwords":["D100"]}`, http.StatusOK},
+		{"ok words and dwords", `{"words":["D100"],"dwords":["D200"]}`, http.StatusOK},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/random-read", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			handleRandomRead(q)(rec, req)
+			if rec.Code != tc.wantStatus {
+				t.Errorf("status = %d, want %d (body: %s)", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+		})
+	}
+
+	t.Run("returns correct values", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/random-read", strings.NewReader(`{"words":["D100","D200"]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomRead(q)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rec.Code)
+		}
+		var resp struct {
+			Words  []int   `json:"words"`
+			Dwords []int64 `json:"dwords"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(resp.Words) != 2 || resp.Words[0] != 1234 || resp.Words[1] != 5678 {
+			t.Errorf("words = %v, want [1234 5678]", resp.Words)
+		}
+	})
+
+	t.Run("method not allowed", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/random-read", nil)
+		rec := httptest.NewRecorder()
+		handleRandomRead(q)(rec, req)
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Errorf("status = %d, want 405", rec.Code)
+		}
+	})
+}
+
+func TestHandleRandomWrite(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{})
+
+	cases := []struct {
+		name       string
+		body       string
+		wantStatus int
+	}{
+		{"empty body", `{}`, http.StatusBadRequest},
+		{"all empty arrays", `{"words":[],"dwords":[],"bits":[]}`, http.StatusBadRequest},
+		{"bit device in words", `{"words":[{"addr":"M0","value":1}]}`, http.StatusBadRequest},
+		{"word device in bits", `{"bits":[{"addr":"D100","value":true}]}`, http.StatusBadRequest},
+		{"bit suffix in words", `{"words":[{"addr":"D100.0","value":1}]}`, http.StatusBadRequest},
+		{"ok words", `{"words":[{"addr":"D100","value":42}]}`, http.StatusOK},
+		{"ok bits", `{"bits":[{"addr":"M0","value":true}]}`, http.StatusOK},
+		{"ok dwords", `{"dwords":[{"addr":"D100","value":65536}]}`, http.StatusOK},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/random-write", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			handleRandomWrite(q, false)(rec, req)
+			if rec.Code != tc.wantStatus {
+				t.Errorf("status = %d, want %d (body: %s)", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+		})
+	}
+
+	t.Run("writes word values", func(t *testing.T) {
+		q2 := newMockPLCQueue(t, map[string]uint16{})
+		req := httptest.NewRequest(http.MethodPost, "/random-write",
+			strings.NewReader(`{"words":[{"addr":"D10","value":999}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomWrite(q2, false)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("readonly rejected", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/random-write",
+			strings.NewReader(`{"words":[{"addr":"D10","value":1}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomWrite(q, true)(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("status = %d, want 403", rec.Code)
+		}
+	})
 }
 
 func waitForWorkQueueClosed(t *testing.T, queue *WorkQueue) {
