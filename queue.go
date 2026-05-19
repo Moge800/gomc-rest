@@ -383,8 +383,12 @@ func (q *PLCQueue) Metrics() map[string]any {
 	}
 
 	c := &q.client
+	cBusy := c.busyCount.Load()
 	cReqs := c.requests.Load()
-	cNonBusy := cReqs - c.busyCount.Load()
+	cNonBusy := cReqs - cBusy
+	if cNonBusy < 0 {
+		cNonBusy = 0
+	}
 	var cAvgMs float64
 	if cNonBusy > 0 {
 		cAvgMs = math.Round(float64(c.totalNs.Load())/float64(cNonBusy)/1e6*100) / 100
@@ -398,7 +402,7 @@ func (q *PLCQueue) Metrics() map[string]any {
 		"recent_avg_latency_ms":        m.recentAvgMs(),
 		"queue_length":                 len(q.work.jobs),
 		"client_request_count":         cReqs,
-		"busy_count":                   c.busyCount.Load(),
+		"busy_count":                   cBusy,
 		"client_avg_latency_ms":        cAvgMs,
 		"client_recent_avg_latency_ms": c.recentAvgMs(),
 	}
