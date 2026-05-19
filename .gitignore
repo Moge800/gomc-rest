@@ -34,5 +34,6 @@ gomc-rest
 # .idea/
 # .vscode/
 .plan/
-.claude/
+.claude/*
+!.claude/CLAUDE.md
 copilot-instructions.md

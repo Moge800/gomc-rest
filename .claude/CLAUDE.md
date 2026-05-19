@@ -66,6 +66,11 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 
 ---
+**Git Workflow**
+ - Never push directly to main.
+ - Always create a feature branch and open a PR, unless the user explicitly says to push directly.
+
+---
 **Stream Timeout Prevention**
  - Do each task ONE AT A TIME. Complete one, confirm, then move to the next.
  - Never write a file longer than ~150 lines in a single tool call.
