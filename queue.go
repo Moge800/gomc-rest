@@ -290,6 +290,7 @@ func (q *PLCQueue) WriteWordBit(ctx context.Context, device string, addr, bit in
 	_, err := q.exec(ctx, func() (any, error) {
 		doErr := q.plc.do(func(c plcConnection) error {
 			plcStart := time.Now()
+			defer func() { writePLCLatency(ctx, time.Since(plcStart)) }()
 			words, err := c.ReadWords(device, addr, 1)
 			if err != nil {
 				return err
@@ -299,9 +300,7 @@ func (q *PLCQueue) WriteWordBit(ctx context.Context, device string, addr, bit in
 			} else {
 				words[0] &^= 1 << uint(bit)
 			}
-			writeErr := c.WriteWords(device, addr, words)
-			writePLCLatency(ctx, time.Since(plcStart))
-			return writeErr
+			return c.WriteWords(device, addr, words)
 		})
 		return nil, doErr
 	})
