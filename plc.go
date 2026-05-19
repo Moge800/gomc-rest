@@ -98,7 +98,9 @@ func (p *PLCClient) initialConnect() {
 	defer p.mu.Unlock()
 	if err := p.reconnect(); err != nil {
 		slog.Warn("PLC initial connect failed, will retry on first request", "error", err)
+		return
 	}
+	slog.Info("PLC connected", "host", p.host, "port", p.port)
 }
 
 // isConnected reports current connection state. Caller must hold mu.
@@ -141,6 +143,7 @@ func (p *PLCClient) do(fn func(plcConnection) error) error {
 	var connErr *mc.MCProtocolConnectionError
 	if errors.As(err, &connErr) {
 		p.conn = nil
+		slog.Warn("PLC connection lost", "host", p.host, "port", p.port, "error", err)
 		return &connErrWrap{err}
 	}
 	return err
