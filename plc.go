@@ -119,10 +119,13 @@ func (p *PLCClient) do(fn func(plcConnection) error) error {
 	defer p.mu.Unlock()
 
 	if p.conn == nil {
+		slog.Warn("PLC reconnecting", "host", p.host, "port", p.port)
 		if err := p.reconnect(); err != nil {
 			p.metrics.plcErrors.Add(1)
+			slog.Warn("PLC reconnect failed", "error", err)
 			return &connErrWrap{err}
 		}
+		slog.Info("PLC reconnected", "host", p.host, "port", p.port)
 	}
 
 	p.metrics.requests.Add(1)
@@ -159,10 +162,13 @@ func (p *PLCClient) doReset() error {
 	defer p.mu.Unlock()
 
 	if p.conn == nil {
+		slog.Warn("PLC reconnecting", "host", p.host, "port", p.port)
 		if err := p.reconnect(); err != nil {
 			p.metrics.plcErrors.Add(1)
+			slog.Warn("PLC reconnect failed", "error", err)
 			return &connErrWrap{err}
 		}
+		slog.Info("PLC reconnected", "host", p.host, "port", p.port)
 	}
 
 	p.metrics.requests.Add(1)
