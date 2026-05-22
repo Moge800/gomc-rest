@@ -1515,6 +1515,18 @@ func TestHandleRandomRead(t *testing.T) {
 			t.Errorf("status = %d, want 405", rec.Code)
 		}
 	})
+
+	t.Run("sets RawQuery for logging", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/random-read",
+			strings.NewReader(`{"words":["D100","D200"],"dwords":["D300"]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomRead(q)(rec, req)
+		want := "words=D100,D200&dwords=D300"
+		if req.URL.RawQuery != want {
+			t.Errorf("RawQuery = %q, want %q", req.URL.RawQuery, want)
+		}
+	})
 }
 
 func TestHandleRandomWrite(t *testing.T) {
@@ -1566,6 +1578,18 @@ func TestHandleRandomWrite(t *testing.T) {
 		handleRandomWrite(q, true)(rec, req)
 		if rec.Code != http.StatusForbidden {
 			t.Errorf("status = %d, want 403", rec.Code)
+		}
+	})
+
+	t.Run("sets RawQuery for logging", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/random-write",
+			strings.NewReader(`{"words":[{"addr":"D100","value":1}],"dwords":[],"bits":[{"addr":"M0","value":true}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomWrite(q, false)(rec, req)
+		want := "words=D100&dwords=&bits=M0"
+		if req.URL.RawQuery != want {
+			t.Errorf("RawQuery = %q, want %q", req.URL.RawQuery, want)
 		}
 	})
 }
