@@ -38,6 +38,7 @@ func writeErr(w http.ResponseWriter, status int, code, msg string) {
 func buildLogQuery(keys []string, vals [][]string) string {
 	var b strings.Builder
 	b.Grow(maxLogQuery)
+	n := min(len(keys), len(vals))
 	// appendStr writes s into b, truncating with "..." if needed.
 	// Returns true when s fitted fully; false when the limit was reached.
 	appendStr := func(s string) bool {
@@ -57,7 +58,7 @@ func buildLogQuery(keys []string, vals [][]string) string {
 		}
 		return false
 	}
-	for i, key := range keys {
+	for i, key := range keys[:n] {
 		if i > 0 && !appendStr("&") {
 			return b.String()
 		}
