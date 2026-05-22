@@ -45,7 +45,7 @@ func buildLogQuery(keys []string, vals [][]string) string {
 		if rem <= 0 {
 			return false
 		}
-		if len(s) < rem {
+		if len(s) <= rem {
 			b.WriteString(s)
 			return true
 		}
