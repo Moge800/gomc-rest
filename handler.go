@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	maxLogQuery    = 300
 	maxReadCount   = 1024
 	maxWriteValues = 1024
 	maxWriteBody   = 1 << 20
@@ -30,6 +31,13 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func writeErr(w http.ResponseWriter, status int, code, msg string) {
 	body := map[string]any{"status": status, "error": msg, "code": code}
 	writeJSON(w, status, body)
+}
+
+func truncateQuery(q string) string {
+	if len(q) <= maxLogQuery {
+		return q
+	}
+	return q[:maxLogQuery-3] + "..."
 }
 
 func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
@@ -639,7 +647,7 @@ func handleRandomRead(plc *PLCQueue) http.HandlerFunc {
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 			return
 		}
-		r.URL.RawQuery = "words=" + strings.Join(body.Words, ",") + "&dwords=" + strings.Join(body.Dwords, ",")
+		r.URL.RawQuery = truncateQuery("words=" + strings.Join(body.Words, ",") + "&dwords=" + strings.Join(body.Dwords, ","))
 		if len(body.Words)+len(body.Dwords) == 0 {
 			writeErr(w, http.StatusBadRequest, "bad_request", "words and dwords must not both be empty")
 			return
@@ -742,7 +750,7 @@ func handleRandomWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 		for i, e := range body.Bits {
 			bs[i] = e.Addr
 		}
-		r.URL.RawQuery = "words=" + strings.Join(ws, ",") + "&dwords=" + strings.Join(ds, ",") + "&bits=" + strings.Join(bs, ",")
+		r.URL.RawQuery = truncateQuery("words=" + strings.Join(ws, ",") + "&dwords=" + strings.Join(ds, ",") + "&bits=" + strings.Join(bs, ","))
 		if len(body.Words)+len(body.Dwords)+len(body.Bits) == 0 {
 			writeErr(w, http.StatusBadRequest, "bad_request", "words, dwords, and bits must not all be empty")
 			return
