@@ -34,12 +34,12 @@ func writeErr(w http.ResponseWriter, status int, code, msg string) {
 }
 
 // buildLogQuery builds "k0=v,v&k1=v,v" from keys/vals, capped at maxLogQuery bytes.
-// Every write goes through appendStr which stops early so no excess allocation occurs.
+// Writes are bounded to maxLogQuery so the full body is never concatenated into one string.
 func buildLogQuery(keys []string, vals [][]string) string {
 	var b strings.Builder
 	b.Grow(maxLogQuery)
 	n := min(len(keys), len(vals))
-	// appendStr writes s into b, truncating with "..." if needed.
+	// appendStr writes s into b, truncating with "..." when s exceeds remaining capacity.
 	// Returns true when s fitted fully; false when the limit was reached.
 	appendStr := func(s string) bool {
 		rem := maxLogQuery - b.Len()
