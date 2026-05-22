@@ -33,11 +33,32 @@ func writeErr(w http.ResponseWriter, status int, code, msg string) {
 	writeJSON(w, status, body)
 }
 
-func truncateQuery(q string) string {
-	if len(q) <= maxLogQuery {
-		return q
+// buildLogQuery builds "k0=v,v&k1=v,v" from keys/vals, stopping early once
+// maxLogQuery bytes are written so large request bodies cause no extra allocation.
+func buildLogQuery(keys []string, vals [][]string) string {
+	var b strings.Builder
+	for i, key := range keys {
+		if i > 0 {
+			b.WriteByte('&')
+		}
+		b.WriteString(key)
+		b.WriteByte('=')
+		for j, v := range vals[i] {
+			if j > 0 {
+				b.WriteByte(',')
+			}
+			if b.Len()+len(v) >= maxLogQuery {
+				rem := maxLogQuery - b.Len()
+				if rem > 3 {
+					b.WriteString(v[:rem-3])
+				}
+				b.WriteString("...")
+				return b.String()
+			}
+			b.WriteString(v)
+		}
 	}
-	return q[:maxLogQuery-3] + "..."
+	return b.String()
 }
 
 func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
@@ -647,7 +668,7 @@ func handleRandomRead(plc *PLCQueue) http.HandlerFunc {
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 			return
 		}
-		r.URL.RawQuery = truncateQuery("words=" + strings.Join(body.Words, ",") + "&dwords=" + strings.Join(body.Dwords, ","))
+		r.URL.RawQuery = buildLogQuery([]string{"words", "dwords"}, [][]string{body.Words, body.Dwords})
 		if len(body.Words)+len(body.Dwords) == 0 {
 			writeErr(w, http.StatusBadRequest, "bad_request", "words and dwords must not both be empty")
 			return
@@ -750,7 +771,7 @@ func handleRandomWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 		for i, e := range body.Bits {
 			bs[i] = e.Addr
 		}
-		r.URL.RawQuery = truncateQuery("words=" + strings.Join(ws, ",") + "&dwords=" + strings.Join(ds, ",") + "&bits=" + strings.Join(bs, ","))
+		r.URL.RawQuery = buildLogQuery([]string{"words", "dwords", "bits"}, [][]string{ws, ds, bs})
 		if len(body.Words)+len(body.Dwords)+len(body.Bits) == 0 {
 			writeErr(w, http.StatusBadRequest, "bad_request", "words, dwords, and bits must not all be empty")
 			return
