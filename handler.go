@@ -33,29 +33,44 @@ func writeErr(w http.ResponseWriter, status int, code, msg string) {
 	writeJSON(w, status, body)
 }
 
-// buildLogQuery builds "k0=v,v&k1=v,v" from keys/vals, stopping early once
-// maxLogQuery bytes are written so large request bodies cause no extra allocation.
+// buildLogQuery builds "k0=v,v&k1=v,v" from keys/vals, capped at maxLogQuery bytes.
+// Every write goes through appendStr which stops early so no excess allocation occurs.
 func buildLogQuery(keys []string, vals [][]string) string {
 	var b strings.Builder
-	for i, key := range keys {
-		if i > 0 {
-			b.WriteByte('&')
+	b.Grow(maxLogQuery)
+	// appendStr writes s into b, truncating with "..." if needed.
+	// Returns true when s fitted fully; false when the limit was reached.
+	appendStr := func(s string) bool {
+		rem := maxLogQuery - b.Len()
+		if rem <= 0 {
+			return false
 		}
-		b.WriteString(key)
-		b.WriteByte('=')
+		if len(s) < rem {
+			b.WriteString(s)
+			return true
+		}
+		if rem > 3 {
+			b.WriteString(s[:rem-3])
+			b.WriteString("...")
+		} else {
+			b.WriteString(s[:rem])
+		}
+		return false
+	}
+	for i, key := range keys {
+		if i > 0 && !appendStr("&") {
+			return b.String()
+		}
+		if !appendStr(key + "=") {
+			return b.String()
+		}
 		for j, v := range vals[i] {
-			if j > 0 {
-				b.WriteByte(',')
-			}
-			if b.Len()+len(v) >= maxLogQuery {
-				rem := maxLogQuery - b.Len()
-				if rem > 3 {
-					b.WriteString(v[:rem-3])
-				}
-				b.WriteString("...")
+			if j > 0 && !appendStr(",") {
 				return b.String()
 			}
-			b.WriteString(v)
+			if !appendStr(v) {
+				return b.String()
+			}
 		}
 	}
 	return b.String()
@@ -759,17 +774,17 @@ func handleRandomWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 			return
 		}
-		ws := make([]string, len(body.Words))
-		for i, e := range body.Words {
-			ws[i] = e.Addr
+		ws := make([]string, min(len(body.Words), maxRandomCount))
+		for i := range ws {
+			ws[i] = body.Words[i].Addr
 		}
-		ds := make([]string, len(body.Dwords))
-		for i, e := range body.Dwords {
-			ds[i] = e.Addr
+		ds := make([]string, min(len(body.Dwords), maxRandomCount))
+		for i := range ds {
+			ds[i] = body.Dwords[i].Addr
 		}
-		bs := make([]string, len(body.Bits))
-		for i, e := range body.Bits {
-			bs[i] = e.Addr
+		bs := make([]string, min(len(body.Bits), maxRandomCount))
+		for i := range bs {
+			bs[i] = body.Bits[i].Addr
 		}
 		r.URL.RawQuery = buildLogQuery([]string{"words", "dwords", "bits"}, [][]string{ws, ds, bs})
 		if len(body.Words)+len(body.Dwords)+len(body.Bits) == 0 {
