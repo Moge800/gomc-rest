@@ -730,15 +730,19 @@ func handleRandomWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 			return
 		}
-		{
-			ws := make([]string, len(body.Words))
-			for i, e := range body.Words { ws[i] = e.Addr }
-			ds := make([]string, len(body.Dwords))
-			for i, e := range body.Dwords { ds[i] = e.Addr }
-			bs := make([]string, len(body.Bits))
-			for i, e := range body.Bits { bs[i] = e.Addr }
-			r.URL.RawQuery = "words=" + strings.Join(ws, ",") + "&dwords=" + strings.Join(ds, ",") + "&bits=" + strings.Join(bs, ",")
+		ws := make([]string, len(body.Words))
+		for i, e := range body.Words {
+			ws[i] = e.Addr
 		}
+		ds := make([]string, len(body.Dwords))
+		for i, e := range body.Dwords {
+			ds[i] = e.Addr
+		}
+		bs := make([]string, len(body.Bits))
+		for i, e := range body.Bits {
+			bs[i] = e.Addr
+		}
+		r.URL.RawQuery = "words=" + strings.Join(ws, ",") + "&dwords=" + strings.Join(ds, ",") + "&bits=" + strings.Join(bs, ",")
 		if len(body.Words)+len(body.Dwords)+len(body.Bits) == 0 {
 			writeErr(w, http.StatusBadRequest, "bad_request", "words, dwords, and bits must not all be empty")
 			return
