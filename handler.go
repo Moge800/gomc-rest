@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strconv"
+	"strings"
 
 	mc "github.com/moge800/gomcprotocol"
 )
@@ -638,6 +639,7 @@ func handleRandomRead(plc *PLCQueue) http.HandlerFunc {
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 			return
 		}
+		r.URL.RawQuery = "words=" + strings.Join(body.Words, ",") + "&dwords=" + strings.Join(body.Dwords, ",")
 		if len(body.Words)+len(body.Dwords) == 0 {
 			writeErr(w, http.StatusBadRequest, "bad_request", "words and dwords must not both be empty")
 			return
@@ -727,6 +729,15 @@ func handleRandomWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 			}
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 			return
+		}
+		{
+			ws := make([]string, len(body.Words))
+			for i, e := range body.Words { ws[i] = e.Addr }
+			ds := make([]string, len(body.Dwords))
+			for i, e := range body.Dwords { ds[i] = e.Addr }
+			bs := make([]string, len(body.Bits))
+			for i, e := range body.Bits { bs[i] = e.Addr }
+			r.URL.RawQuery = "words=" + strings.Join(ws, ",") + "&dwords=" + strings.Join(ds, ",") + "&bits=" + strings.Join(bs, ",")
 		}
 		if len(body.Words)+len(body.Dwords)+len(body.Bits) == 0 {
 			writeErr(w, http.StatusBadRequest, "bad_request", "words, dwords, and bits must not all be empty")
