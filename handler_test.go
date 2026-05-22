@@ -1516,13 +1516,28 @@ func TestHandleRandomRead(t *testing.T) {
 		}
 	})
 
-	t.Run("sets RawQuery for logging", func(t *testing.T) {
+	t.Run("sets RawQuery for logging on 200", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/random-read",
 			strings.NewReader(`{"words":["D100","D200"],"dwords":["D300"]}`))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		handleRandomRead(q)(rec, req)
 		want := "words=D100,D200&dwords=D300"
+		if req.URL.RawQuery != want {
+			t.Errorf("RawQuery = %q, want %q", req.URL.RawQuery, want)
+		}
+	})
+
+	t.Run("sets RawQuery for logging on 400", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/random-read",
+			strings.NewReader(`{"words":["INVALID"]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomRead(q)(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", rec.Code)
+		}
+		want := "words=INVALID&dwords="
 		if req.URL.RawQuery != want {
 			t.Errorf("RawQuery = %q, want %q", req.URL.RawQuery, want)
 		}
@@ -1581,13 +1596,28 @@ func TestHandleRandomWrite(t *testing.T) {
 		}
 	})
 
-	t.Run("sets RawQuery for logging", func(t *testing.T) {
+	t.Run("sets RawQuery for logging on 200", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/random-write",
 			strings.NewReader(`{"words":[{"addr":"D100","value":1}],"dwords":[],"bits":[{"addr":"M0","value":true}]}`))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		handleRandomWrite(q, false)(rec, req)
 		want := "words=D100&dwords=&bits=M0"
+		if req.URL.RawQuery != want {
+			t.Errorf("RawQuery = %q, want %q", req.URL.RawQuery, want)
+		}
+	})
+
+	t.Run("sets RawQuery for logging on 400", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/random-write",
+			strings.NewReader(`{"words":[{"addr":"INVALID","value":1}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomWrite(q, false)(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", rec.Code)
+		}
+		want := "words=INVALID&dwords=&bits="
 		if req.URL.RawQuery != want {
 			t.Errorf("RawQuery = %q, want %q", req.URL.RawQuery, want)
 		}
