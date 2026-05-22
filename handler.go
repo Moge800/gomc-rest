@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strconv"
+	"strings"
 
 	mc "github.com/moge800/gomcprotocol"
 )
 
 const (
+	maxLogQuery    = 300
 	maxReadCount   = 1024
 	maxWriteValues = 1024
 	maxWriteBody   = 1 << 20
@@ -29,6 +31,50 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func writeErr(w http.ResponseWriter, status int, code, msg string) {
 	body := map[string]any{"status": status, "error": msg, "code": code}
 	writeJSON(w, status, body)
+}
+
+// buildLogQuery builds "k0=v,v&k1=v,v" from keys/vals, capped at maxLogQuery bytes.
+// Writes are bounded to maxLogQuery so the full body is never concatenated into one string.
+func buildLogQuery(keys []string, vals [][]string) string {
+	var b strings.Builder
+	b.Grow(maxLogQuery)
+	n := min(len(keys), len(vals))
+	// appendStr writes s into b, truncating with "..." when s exceeds remaining capacity.
+	// Returns true when s fitted fully; false when the limit was reached.
+	appendStr := func(s string) bool {
+		rem := maxLogQuery - b.Len()
+		if rem <= 0 {
+			return false
+		}
+		if len(s) <= rem {
+			b.WriteString(s)
+			return true
+		}
+		if rem > 3 {
+			b.WriteString(s[:rem-3])
+			b.WriteString("...")
+		} else {
+			b.WriteString(s[:rem])
+		}
+		return false
+	}
+	for i, key := range keys[:n] {
+		if i > 0 && !appendStr("&") {
+			return b.String()
+		}
+		if !appendStr(key + "=") {
+			return b.String()
+		}
+		for j, v := range vals[i] {
+			if j > 0 && !appendStr(",") {
+				return b.String()
+			}
+			if !appendStr(v) {
+				return b.String()
+			}
+		}
+	}
+	return b.String()
 }
 
 func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
@@ -638,6 +684,7 @@ func handleRandomRead(plc *PLCQueue) http.HandlerFunc {
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 			return
 		}
+		r.URL.RawQuery = buildLogQuery([]string{"words", "dwords"}, [][]string{body.Words, body.Dwords})
 		if len(body.Words)+len(body.Dwords) == 0 {
 			writeErr(w, http.StatusBadRequest, "bad_request", "words and dwords must not both be empty")
 			return
@@ -728,6 +775,19 @@ func handleRandomWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 			writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 			return
 		}
+		ws := make([]string, min(len(body.Words), maxRandomCount))
+		for i := range ws {
+			ws[i] = body.Words[i].Addr
+		}
+		ds := make([]string, min(len(body.Dwords), maxRandomCount))
+		for i := range ds {
+			ds[i] = body.Dwords[i].Addr
+		}
+		bs := make([]string, min(len(body.Bits), maxRandomCount))
+		for i := range bs {
+			bs[i] = body.Bits[i].Addr
+		}
+		r.URL.RawQuery = buildLogQuery([]string{"words", "dwords", "bits"}, [][]string{ws, ds, bs})
 		if len(body.Words)+len(body.Dwords)+len(body.Bits) == 0 {
 			writeErr(w, http.StatusBadRequest, "bad_request", "words, dwords, and bits must not all be empty")
 			return
