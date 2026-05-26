@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/charmbracelet/log v1.0.0
-	github.com/moge800/gomcprotocol v0.3.0
+	github.com/moge800/gomcprotocol v1.0.0
 )
 
 require (
