@@ -482,6 +482,62 @@ func TestHandleWriteSintDwordRejectsOutOfRange(t *testing.T) {
 	}
 }
 
+func TestHandleReadBoolParams(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{"D100": 0, "D101": 0})
+	cases := []struct {
+		query string
+		want  int
+	}{
+		{"/read?addr=D100&dword=True", http.StatusOK},
+		{"/read?addr=D100&dword=TRUE", http.StatusOK},
+		{"/read?addr=D100&dword=true", http.StatusOK},
+		{"/read?addr=D100&dword=false", http.StatusOK},
+		{"/read?addr=D100&dword=1", http.StatusBadRequest},
+		{"/read?addr=D100&dword=0", http.StatusBadRequest},
+		{"/read?addr=D100&dword=abc", http.StatusBadRequest},
+		{"/read?addr=D100&sint=True", http.StatusOK},
+		{"/read?addr=D100&sint=1", http.StatusBadRequest},
+		{"/read?addr=D100&foo=bar", http.StatusBadRequest},
+		{"/read?addr=D100&dword=true&extra=1", http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodGet, tc.query, nil)
+		rec := httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
+		}
+	}
+}
+
+func TestHandleWriteBoolParams(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{})
+	cases := []struct {
+		query string
+		body  string
+		want  int
+	}{
+		{"/write?addr=D100&dword=True", `{"values":[0]}`, http.StatusOK},
+		{"/write?addr=D100&dword=TRUE", `{"values":[0]}`, http.StatusOK},
+		{"/write?addr=D100&dword=true", `{"values":[0]}`, http.StatusOK},
+		{"/write?addr=D100&dword=false", `{"values":[0]}`, http.StatusOK},
+		{"/write?addr=D100&dword=1", `{"values":[0]}`, http.StatusBadRequest},
+		{"/write?addr=D100&dword=0", `{"values":[0]}`, http.StatusBadRequest},
+		{"/write?addr=D100&dword=abc", `{"values":[0]}`, http.StatusBadRequest},
+		{"/write?addr=D100&sint=True", `{"values":[0]}`, http.StatusOK},
+		{"/write?addr=D100&sint=1", `{"values":[0]}`, http.StatusBadRequest},
+		{"/write?addr=D100&foo=bar", `{"values":[0]}`, http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodPost, tc.query, strings.NewReader(tc.body))
+		rec := httptest.NewRecorder()
+		handleWrite(q, false)(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
+		}
+	}
+}
+
 func TestHandleReadBitAccessRejectsBitDevice(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/read?addr=M0.0", nil)
 	rec := httptest.NewRecorder()
