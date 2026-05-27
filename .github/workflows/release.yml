@@ -21,7 +21,7 @@ jobs:
         run: go test ./...
 
       - name: Build (Windows amd64)
-        run: GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=${GITHUB_REF_NAME}" -o gomc-rest.exe .
+        run: GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" -o gomc-rest.exe .
 
       - name: Generate checksums
         run: sha256sum gomc-rest.exe > checksums.txt
