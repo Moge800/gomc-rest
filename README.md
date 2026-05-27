@@ -211,7 +211,7 @@ Notes:
 - `/random-write` accepts `words`, `dwords`, and `bits` arrays. Each entry is `{"addr":"...","value":...}`. `words` and `dwords` require word devices; `bits` requires bit devices. Internally calls `RandomWrite` for words/dwords and `RandomWriteBits` for bits within one serialized job. Maximum 255 entries per array.
 - `/remote/*` endpoints are disabled by default and return `403 forbidden` unless the server is started with `-enable-remote`. This is separate from read-only mode.
 - When read-only mode is enabled, POST operations on `/write` and `/remote/*` return `403 forbidden`. Read-only mode is a safety aid, not a replacement for network isolation, authentication, authorization, firewall rules, or PLC-side protection.
-- Boolean query flags (`dword`, `sint`, `force`) are enabled only when the query string value is exactly `true`.
+- Boolean query flags (`dword`, `sint`, `force`) accept `true` or `false` (case-insensitive). Any other value returns `400 bad_request`. Unknown query parameters also return `400 bad_request`.
 - `GET /health` always returns HTTP `200`, even when the PLC is disconnected.
 - `/remote/reset` clears the TCP connection because the PLC closes it after reset.
 - `/metrics` PLC fields (`request_count`, `avg_latency_ms`, `recent_avg_latency_ms`) measure only the PLC wire time. Client fields (`client_request_count`, `client_avg_latency_ms`, `client_recent_avg_latency_ms`) measure the full round-trip including queue wait time. `busy_count` counts requests rejected because the queue was full; these are excluded from the client latency averages.

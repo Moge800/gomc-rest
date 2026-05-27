@@ -510,6 +510,28 @@ func TestHandleReadBoolParams(t *testing.T) {
 	}
 }
 
+// TestHandleReadDwordCaseInsensitive verifies that dword=True/TRUE actually
+// enables double-word mode — count=513 exceeds the dword limit (512) but is
+// within the word limit (1024), so it is rejected only when dword is true.
+func TestHandleReadDwordCaseInsensitive(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{})
+	for _, param := range []string{"true", "True", "TRUE"} {
+		req := httptest.NewRequest(http.MethodGet, "/read?addr=D100&dword="+param+"&count=513", nil)
+		rec := httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("dword=%s count=513: status=%d want 400 (dword count limit is 512)", param, rec.Code)
+		}
+	}
+	// dword=false: count=513 is within the word limit (1024) → 200
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100&dword=false&count=513", nil)
+	rec := httptest.NewRecorder()
+	handleRead(q)(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("dword=false count=513: status=%d want 200 (word limit is 1024)", rec.Code)
+	}
+}
+
 func TestHandleWriteBoolParams(t *testing.T) {
 	q := newMockPLCQueue(t, map[string]uint16{})
 	cases := []struct {
@@ -535,6 +557,30 @@ func TestHandleWriteBoolParams(t *testing.T) {
 		if rec.Code != tc.want {
 			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
 		}
+	}
+}
+
+// TestHandleWriteDwordCaseInsensitive verifies that dword=True/TRUE actually
+// enables double-word mode — 70000 (>uint16 max) succeeds only when dword is true.
+func TestHandleWriteDwordCaseInsensitive(t *testing.T) {
+	for _, param := range []string{"true", "True", "TRUE"} {
+		q := newMockPLCQueue(t, map[string]uint16{})
+		req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword="+param,
+			strings.NewReader(`{"values":[70000]}`))
+		rec := httptest.NewRecorder()
+		handleWrite(q, false)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("dword=%s status=%d want 200 (70000 must be accepted in dword mode)", param, rec.Code)
+		}
+	}
+	// dword=false: 70000 > uint16 max → JSON unmarshal into []uint16 fails → 400
+	q := newMockPLCQueue(t, map[string]uint16{})
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=false",
+		strings.NewReader(`{"values":[70000]}`))
+	rec := httptest.NewRecorder()
+	handleWrite(q, false)(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("dword=false with 70000: status=%d want 400", rec.Code)
 	}
 }
 
