@@ -838,6 +838,36 @@ func TestHandleRemoteDisabledRejects(t *testing.T) {
 	}
 }
 
+func TestHandleRemoteRunForceParam(t *testing.T) {
+	cases := []struct {
+		query string
+		want  int
+	}{
+		{"/remote/run", http.StatusOK},
+		{"/remote/run?force=true", http.StatusOK},
+		{"/remote/run?force=True", http.StatusOK},
+		{"/remote/run?force=TRUE", http.StatusOK},
+		{"/remote/run?force=false", http.StatusOK},
+		{"/remote/run?force=False", http.StatusOK},
+		{"/remote/run?clear=0", http.StatusOK},
+		{"/remote/run?clear=2", http.StatusOK},
+		{"/remote/run?force=true&clear=1", http.StatusOK},
+		{"/remote/run?force=", http.StatusBadRequest},
+		{"/remote/run?force=1", http.StatusBadRequest},
+		{"/remote/run?force=true&force=false", http.StatusBadRequest},
+		{"/remote/run?clear=3", http.StatusBadRequest},
+		{"/remote/run?foo=bar", http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodPost, tc.query, nil)
+		rec := httptest.NewRecorder()
+		handleRemoteRun(newMockPLCQueue(t, nil), false, true)(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
+		}
+	}
+}
+
 func TestHandleRemotePauseForceParam(t *testing.T) {
 	cases := []struct {
 		query string
@@ -865,13 +895,14 @@ func TestHandleRemotePauseForceParam(t *testing.T) {
 }
 
 func TestHandleBoolParamEmptyValue(t *testing.T) {
-	// ?dword= (empty value) must return 400, not silently default to false
+	// ?dword= (empty) and ?dword=true&dword=false (duplicated) must return 400
 	cases := []struct {
 		query string
 		want  int
 	}{
 		{"/read?addr=D100&dword=", http.StatusBadRequest},
 		{"/read?addr=D100&sint=", http.StatusBadRequest},
+		{"/read?addr=D100&dword=true&dword=false", http.StatusBadRequest},
 	}
 	q := newMockPLCQueue(t, map[string]uint16{})
 	for _, tc := range cases {

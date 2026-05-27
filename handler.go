@@ -80,12 +80,15 @@ func buildLogQuery(keys []string, vals [][]string) string {
 }
 
 // parseBoolParam parses a boolean query parameter.
-// Absent → false, nil. "true"/"false" (case-insensitive) → value, nil.
-// Any other value (including empty string) → false, error (caller should return 400).
+// Absent → false, nil. "true"/"false" (case-insensitive, exactly once) → value, nil.
+// Empty, duplicated, or any other value → false, error (caller should return 400).
 func parseBoolParam(q url.Values, key string) (bool, error) {
 	vals, ok := q[key]
 	if !ok {
 		return false, nil
+	}
+	if len(vals) != 1 {
+		return false, fmt.Errorf("invalid %s: must appear exactly once", key)
 	}
 	switch strings.ToLower(vals[0]) {
 	case "true":
