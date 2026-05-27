@@ -838,6 +838,52 @@ func TestHandleRemoteDisabledRejects(t *testing.T) {
 	}
 }
 
+func TestHandleRemotePauseForceParam(t *testing.T) {
+	cases := []struct {
+		query string
+		want  int
+	}{
+		{"/remote/pause", http.StatusOK},
+		{"/remote/pause?force=true", http.StatusOK},
+		{"/remote/pause?force=True", http.StatusOK},
+		{"/remote/pause?force=TRUE", http.StatusOK},
+		{"/remote/pause?force=false", http.StatusOK},
+		{"/remote/pause?force=False", http.StatusOK},
+		{"/remote/pause?force=", http.StatusBadRequest},
+		{"/remote/pause?force=1", http.StatusBadRequest},
+		{"/remote/pause?force=abc", http.StatusBadRequest},
+		{"/remote/pause?foo=bar", http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodPost, tc.query, nil)
+		rec := httptest.NewRecorder()
+		handleRemotePause(newMockPLCQueue(t, nil), false, true)(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
+		}
+	}
+}
+
+func TestHandleBoolParamEmptyValue(t *testing.T) {
+	// ?dword= (empty value) must return 400, not silently default to false
+	cases := []struct {
+		query string
+		want  int
+	}{
+		{"/read?addr=D100&dword=", http.StatusBadRequest},
+		{"/read?addr=D100&sint=", http.StatusBadRequest},
+	}
+	q := newMockPLCQueue(t, map[string]uint16{})
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodGet, tc.query, nil)
+		rec := httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
+		}
+	}
+}
+
 func TestParseConfigEnableRemoteEnv(t *testing.T) {
 	lookupEnv := func(key string) string {
 		if key == "GOMCR_ENABLE_REMOTE" {
