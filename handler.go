@@ -35,6 +35,19 @@ func writeErr(w http.ResponseWriter, status int, code, msg string) {
 	writeJSON(w, status, body)
 }
 
+// capLogQuery truncates s to maxLogQuery bytes for safe logging.
+// Prevents unbounded RawQuery values (e.g. on early-exit error paths) from
+// inflating log lines.
+func capLogQuery(s string) string {
+	if len(s) <= maxLogQuery {
+		return s
+	}
+	if maxLogQuery > 3 {
+		return s[:maxLogQuery-3] + "..."
+	}
+	return s[:maxLogQuery]
+}
+
 // buildLogQuery builds "k0=v,v&k1=v,v" from keys/vals, capped at maxLogQuery bytes.
 // Writes are bounded to maxLogQuery so the full body is never concatenated into one string.
 func buildLogQuery(keys []string, vals [][]string) string {

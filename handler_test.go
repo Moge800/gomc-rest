@@ -1445,14 +1445,21 @@ func TestNoParamEndpointsRejectUnknownParams(t *testing.T) {
 		method string
 		path   string
 	}{
+		// GET endpoints
 		{http.MethodGet, "/health?foo=bar"},
 		{http.MethodGet, "/metrics?foo=bar"},
 		{http.MethodGet, "/version?foo=bar"},
 		{http.MethodGet, "/info?foo=bar"},
 		{http.MethodGet, "/openapi.yaml?foo=bar"},
+		// POST endpoints with no query params
+		{http.MethodPost, "/random-read?foo=bar"},
+		{http.MethodPost, "/random-write?foo=bar"},
+		{http.MethodPost, "/remote/stop?foo=bar"},
+		{http.MethodPost, "/remote/latch-clear?foo=bar"},
+		{http.MethodPost, "/remote/reset?foo=bar"},
 	}
 	for _, ep := range endpoints {
-		req := httptest.NewRequest(ep.method, ep.path, nil)
+		req := httptest.NewRequest(ep.method, ep.path, strings.NewReader("{}"))
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, req)
 		if rec.Code != http.StatusBadRequest {
