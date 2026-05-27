@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -31,6 +33,19 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func writeErr(w http.ResponseWriter, status int, code, msg string) {
 	body := map[string]any{"status": status, "error": msg, "code": code}
 	writeJSON(w, status, body)
+}
+
+// capLogQuery truncates s to maxLogQuery bytes for safe logging.
+// Prevents unbounded RawQuery values (e.g. on early-exit error paths) from
+// inflating log lines.
+func capLogQuery(s string) string {
+	if len(s) <= maxLogQuery {
+		return s
+	}
+	if maxLogQuery > 3 {
+		return s[:maxLogQuery-3] + "..."
+	}
+	return s[:maxLogQuery]
 }
 
 // buildLogQuery builds "k0=v,v&k1=v,v" from keys/vals, capped at maxLogQuery bytes.
@@ -75,6 +90,43 @@ func buildLogQuery(keys []string, vals [][]string) string {
 		}
 	}
 	return b.String()
+}
+
+// parseBoolParam parses a boolean query parameter.
+// Absent → false, nil. "true"/"false" (case-insensitive, exactly once) → value, nil.
+// Empty, duplicated, or any other value → false, error (caller should return 400).
+func parseBoolParam(q url.Values, key string) (bool, error) {
+	vals, ok := q[key]
+	if !ok {
+		return false, nil
+	}
+	if len(vals) != 1 {
+		return false, fmt.Errorf("invalid %s: must appear exactly once", key)
+	}
+	switch strings.ToLower(vals[0]) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	}
+	return false, fmt.Errorf("invalid %s: must be true or false", key)
+}
+
+// rejectUnknownParams returns an error if q contains any key not in allowed.
+func rejectUnknownParams(q url.Values, allowed ...string) error {
+	for key := range q {
+		found := false
+		for _, a := range allowed {
+			if key == a {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("unknown parameter: %s", key)
+		}
+	}
+	return nil
 }
 
 func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
@@ -145,6 +197,10 @@ func handleOpenAPI(spec []byte) http.HandlerFunc {
 		if !requireMethod(w, r, http.MethodGet) {
 			return
 		}
+		if err := rejectUnknownParams(r.URL.Query()); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
 		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(spec)
@@ -157,6 +213,10 @@ func handleMetrics(plc *PLCQueue) http.HandlerFunc {
 		if !requireMethod(w, r, http.MethodGet) {
 			return
 		}
+		if err := rejectUnknownParams(r.URL.Query()); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
 		writeJSON(w, http.StatusOK, plc.Metrics())
 	}
 }
@@ -165,6 +225,10 @@ func handleMetrics(plc *PLCQueue) http.HandlerFunc {
 func handleVersion() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
+		if err := rejectUnknownParams(r.URL.Query()); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"version": version})
@@ -178,6 +242,10 @@ func handleInfo(cfg ServerConfig) http.HandlerFunc {
 	mcVersion := gomcprotocolVersion()
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
+		if err := rejectUnknownParams(r.URL.Query()); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -249,6 +317,10 @@ func handleHealth(plc *PLCQueue) http.HandlerFunc {
 		if !requireMethod(w, r, http.MethodGet) {
 			return
 		}
+		if err := rejectUnknownParams(r.URL.Query()); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
 		connected := plc.IsConnected()
 
 		plcStatus := "ok"
@@ -270,12 +342,17 @@ func handleRead(plc *PLCQueue) http.HandlerFunc {
 			return
 		}
 
-		addrStr := r.URL.Query().Get("addr")
+		q := r.URL.Query()
+		if err := rejectUnknownParams(q, "addr", "count", "dword", "sint"); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+		addrStr := q.Get("addr")
 		if addrStr == "" {
 			writeErr(w, http.StatusBadRequest, "bad_request", "addr is required")
 			return
 		}
-		countStr := r.URL.Query().Get("count")
+		countStr := q.Get("count")
 		count := 1
 		if countStr != "" {
 			n, err := strconv.Atoi(countStr)
@@ -290,7 +367,11 @@ func handleRead(plc *PLCQueue) http.HandlerFunc {
 			return
 		}
 
-		dword := r.URL.Query().Get("dword") == "true"
+		dword, err := parseBoolParam(q, "dword")
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
 
 		if dword && count > maxReadCount/2 {
 			writeErr(w, http.StatusBadRequest, "bad_request", "dword count must be "+strconv.Itoa(maxReadCount/2)+" or less")
@@ -303,7 +384,11 @@ func handleRead(plc *PLCQueue) http.HandlerFunc {
 			return
 		}
 
-		sint := r.URL.Query().Get("sint") == "true"
+		sint, err := parseBoolParam(q, "sint")
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
 
 		if da.Bit >= 0 {
 			if dword || sint {
@@ -388,7 +473,12 @@ func handleWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 			return
 		}
 
-		addrStr := r.URL.Query().Get("addr")
+		q := r.URL.Query()
+		if err := rejectUnknownParams(q, "addr", "dword", "sint"); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+		addrStr := q.Get("addr")
 		if addrStr == "" {
 			writeErr(w, http.StatusBadRequest, "bad_request", "addr is required")
 			return
@@ -400,8 +490,16 @@ func handleWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 			return
 		}
 
-		dword := r.URL.Query().Get("dword") == "true"
-		sint := r.URL.Query().Get("sint") == "true"
+		dword, err := parseBoolParam(q, "dword")
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+		sint, err := parseBoolParam(q, "sint")
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
 
 		if da.Bit >= 0 {
 			if dword || sint {
@@ -584,8 +682,13 @@ func handleRemoteRun(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFun
 		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
+		q := r.URL.Query()
+		if err := rejectUnknownParams(q, "force", "clear"); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
 		clear := 0
-		if s := r.URL.Query().Get("clear"); s != "" {
+		if s := q.Get("clear"); s != "" {
 			n, err := strconv.Atoi(s)
 			if err != nil || n < 0 || n > 2 {
 				writeErr(w, http.StatusBadRequest, "bad_request", "clear must be 0, 1, or 2")
@@ -593,7 +696,11 @@ func handleRemoteRun(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFun
 			}
 			clear = n
 		}
-		force := r.URL.Query().Get("force") == "true"
+		force, err := parseBoolParam(q, "force")
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
 
 		if err := plc.RemoteRun(r.Context(), clear, force); err != nil {
 			writePLCErr(w, err)
@@ -613,6 +720,10 @@ func handleRemoteStop(plc *PLCQueue, readonly, enableRemote bool) http.HandlerFu
 			return
 		}
 		if !requireRemoteEnabled(w, enableRemote) {
+			return
+		}
+		if err := rejectUnknownParams(r.URL.Query()); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 			return
 		}
 		if err := plc.RemoteStop(r.Context()); err != nil {
@@ -635,7 +746,16 @@ func handleRemotePause(plc *PLCQueue, readonly, enableRemote bool) http.HandlerF
 		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
-		force := r.URL.Query().Get("force") == "true"
+		q := r.URL.Query()
+		if err := rejectUnknownParams(q, "force"); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+		force, err := parseBoolParam(q, "force")
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
 		if err := plc.RemotePause(r.Context(), force); err != nil {
 			writePLCErr(w, err)
 			return
@@ -656,6 +776,10 @@ func handleRemoteLatchClear(plc *PLCQueue, readonly, enableRemote bool) http.Han
 		if !requireRemoteEnabled(w, enableRemote) {
 			return
 		}
+		if err := rejectUnknownParams(r.URL.Query()); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
 		if err := plc.RemoteLatchClear(r.Context()); err != nil {
 			writePLCErr(w, err)
 			return
@@ -668,6 +792,10 @@ func handleRemoteLatchClear(plc *PLCQueue, readonly, enableRemote bool) http.Han
 func handleRandomRead(plc *PLCQueue) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
+		if err := rejectUnknownParams(r.URL.Query()); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 			return
 		}
 		var body struct {
@@ -749,6 +877,10 @@ func handleRandomWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 			return
 		}
 		if !requireWritable(w, readonly) {
+			return
+		}
+		if err := rejectUnknownParams(r.URL.Query()); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 			return
 		}
 		var body struct {
@@ -871,6 +1003,10 @@ func handleRemoteReset(plc *PLCQueue, readonly, enableRemote bool) http.HandlerF
 			return
 		}
 		if !requireRemoteEnabled(w, enableRemote) {
+			return
+		}
+		if err := rejectUnknownParams(r.URL.Query()); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 			return
 		}
 		if err := plc.RemoteReset(r.Context()); err != nil {

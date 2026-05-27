@@ -482,6 +482,108 @@ func TestHandleWriteSintDwordRejectsOutOfRange(t *testing.T) {
 	}
 }
 
+func TestHandleReadBoolParams(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{"D100": 0, "D101": 0})
+	cases := []struct {
+		query string
+		want  int
+	}{
+		{"/read?addr=D100&dword=True", http.StatusOK},
+		{"/read?addr=D100&dword=TRUE", http.StatusOK},
+		{"/read?addr=D100&dword=true", http.StatusOK},
+		{"/read?addr=D100&dword=false", http.StatusOK},
+		{"/read?addr=D100&dword=1", http.StatusBadRequest},
+		{"/read?addr=D100&dword=0", http.StatusBadRequest},
+		{"/read?addr=D100&dword=abc", http.StatusBadRequest},
+		{"/read?addr=D100&sint=True", http.StatusOK},
+		{"/read?addr=D100&sint=1", http.StatusBadRequest},
+		{"/read?addr=D100&foo=bar", http.StatusBadRequest},
+		{"/read?addr=D100&dword=true&extra=1", http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodGet, tc.query, nil)
+		rec := httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
+		}
+	}
+}
+
+// TestHandleReadDwordCaseInsensitive verifies that dword=True/TRUE actually
+// enables double-word mode — count=513 exceeds the dword limit (512) but is
+// within the word limit (1024), so it is rejected only when dword is true.
+func TestHandleReadDwordCaseInsensitive(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{})
+	for _, param := range []string{"true", "True", "TRUE"} {
+		req := httptest.NewRequest(http.MethodGet, "/read?addr=D100&dword="+param+"&count=513", nil)
+		rec := httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("dword=%s count=513: status=%d want 400 (dword count limit is 512)", param, rec.Code)
+		}
+	}
+	// dword=false: count=513 is within the word limit (1024) → 200
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100&dword=false&count=513", nil)
+	rec := httptest.NewRecorder()
+	handleRead(q)(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("dword=false count=513: status=%d want 200 (word limit is 1024)", rec.Code)
+	}
+}
+
+func TestHandleWriteBoolParams(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{})
+	cases := []struct {
+		query string
+		body  string
+		want  int
+	}{
+		{"/write?addr=D100&dword=True", `{"values":[0]}`, http.StatusOK},
+		{"/write?addr=D100&dword=TRUE", `{"values":[0]}`, http.StatusOK},
+		{"/write?addr=D100&dword=true", `{"values":[0]}`, http.StatusOK},
+		{"/write?addr=D100&dword=false", `{"values":[0]}`, http.StatusOK},
+		{"/write?addr=D100&dword=1", `{"values":[0]}`, http.StatusBadRequest},
+		{"/write?addr=D100&dword=0", `{"values":[0]}`, http.StatusBadRequest},
+		{"/write?addr=D100&dword=abc", `{"values":[0]}`, http.StatusBadRequest},
+		{"/write?addr=D100&sint=True", `{"values":[0]}`, http.StatusOK},
+		{"/write?addr=D100&sint=1", `{"values":[0]}`, http.StatusBadRequest},
+		{"/write?addr=D100&foo=bar", `{"values":[0]}`, http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodPost, tc.query, strings.NewReader(tc.body))
+		rec := httptest.NewRecorder()
+		handleWrite(q, false)(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
+		}
+	}
+}
+
+// TestHandleWriteDwordCaseInsensitive verifies that dword=True/TRUE actually
+// enables double-word mode — 70000 (>uint16 max) succeeds only when dword is true.
+func TestHandleWriteDwordCaseInsensitive(t *testing.T) {
+	for _, param := range []string{"true", "True", "TRUE"} {
+		q := newMockPLCQueue(t, map[string]uint16{})
+		req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword="+param,
+			strings.NewReader(`{"values":[70000]}`))
+		rec := httptest.NewRecorder()
+		handleWrite(q, false)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("dword=%s status=%d want 200 (70000 must be accepted in dword mode)", param, rec.Code)
+		}
+	}
+	// dword=false: 70000 > uint16 max → JSON unmarshal into []uint16 fails → 400
+	q := newMockPLCQueue(t, map[string]uint16{})
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100&dword=false",
+		strings.NewReader(`{"values":[70000]}`))
+	rec := httptest.NewRecorder()
+	handleWrite(q, false)(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("dword=false with 70000: status=%d want 400", rec.Code)
+	}
+}
+
 func TestHandleReadBitAccessRejectsBitDevice(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/read?addr=M0.0", nil)
 	rec := httptest.NewRecorder()
@@ -733,6 +835,83 @@ func TestHandleRemoteDisabledRejects(t *testing.T) {
 				t.Fatalf("error = %q, want remote-control disabled message", body["error"])
 			}
 		})
+	}
+}
+
+func TestHandleRemoteRunForceParam(t *testing.T) {
+	cases := []struct {
+		query string
+		want  int
+	}{
+		{"/remote/run", http.StatusOK},
+		{"/remote/run?force=true", http.StatusOK},
+		{"/remote/run?force=True", http.StatusOK},
+		{"/remote/run?force=TRUE", http.StatusOK},
+		{"/remote/run?force=false", http.StatusOK},
+		{"/remote/run?force=False", http.StatusOK},
+		{"/remote/run?clear=0", http.StatusOK},
+		{"/remote/run?clear=2", http.StatusOK},
+		{"/remote/run?force=true&clear=1", http.StatusOK},
+		{"/remote/run?force=", http.StatusBadRequest},
+		{"/remote/run?force=1", http.StatusBadRequest},
+		{"/remote/run?force=true&force=false", http.StatusBadRequest},
+		{"/remote/run?clear=3", http.StatusBadRequest},
+		{"/remote/run?foo=bar", http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodPost, tc.query, nil)
+		rec := httptest.NewRecorder()
+		handleRemoteRun(newMockPLCQueue(t, nil), false, true)(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
+		}
+	}
+}
+
+func TestHandleRemotePauseForceParam(t *testing.T) {
+	cases := []struct {
+		query string
+		want  int
+	}{
+		{"/remote/pause", http.StatusOK},
+		{"/remote/pause?force=true", http.StatusOK},
+		{"/remote/pause?force=True", http.StatusOK},
+		{"/remote/pause?force=TRUE", http.StatusOK},
+		{"/remote/pause?force=false", http.StatusOK},
+		{"/remote/pause?force=False", http.StatusOK},
+		{"/remote/pause?force=", http.StatusBadRequest},
+		{"/remote/pause?force=1", http.StatusBadRequest},
+		{"/remote/pause?force=abc", http.StatusBadRequest},
+		{"/remote/pause?foo=bar", http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodPost, tc.query, nil)
+		rec := httptest.NewRecorder()
+		handleRemotePause(newMockPLCQueue(t, nil), false, true)(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
+		}
+	}
+}
+
+func TestHandleBoolParamEmptyValue(t *testing.T) {
+	// ?dword= (empty) and ?dword=true&dword=false (duplicated) must return 400
+	cases := []struct {
+		query string
+		want  int
+	}{
+		{"/read?addr=D100&dword=", http.StatusBadRequest},
+		{"/read?addr=D100&sint=", http.StatusBadRequest},
+		{"/read?addr=D100&dword=true&dword=false", http.StatusBadRequest},
+	}
+	q := newMockPLCQueue(t, map[string]uint16{})
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodGet, tc.query, nil)
+		rec := httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("query=%s status=%d, want=%d", tc.query, rec.Code, tc.want)
+		}
 	}
 }
 
@@ -1256,6 +1435,36 @@ func TestHandleMetricsLatencyRounding(t *testing.T) {
 	}
 	if body["recent_avg_latency_ms"] != float64(1.23) {
 		t.Errorf("recent_avg_latency_ms = %v, want 1.23", body["recent_avg_latency_ms"])
+	}
+}
+
+func TestNoParamEndpointsRejectUnknownParams(t *testing.T) {
+	// All no-param endpoints must return 400 for any unknown query parameter.
+	mux := newTestMux(t)
+	endpoints := []struct {
+		method string
+		path   string
+	}{
+		// GET endpoints
+		{http.MethodGet, "/health?foo=bar"},
+		{http.MethodGet, "/metrics?foo=bar"},
+		{http.MethodGet, "/version?foo=bar"},
+		{http.MethodGet, "/info?foo=bar"},
+		{http.MethodGet, "/openapi.yaml?foo=bar"},
+		// POST endpoints with no query params
+		{http.MethodPost, "/random-read?foo=bar"},
+		{http.MethodPost, "/random-write?foo=bar"},
+		{http.MethodPost, "/remote/stop?foo=bar"},
+		{http.MethodPost, "/remote/latch-clear?foo=bar"},
+		{http.MethodPost, "/remote/reset?foo=bar"},
+	}
+	for _, ep := range endpoints {
+		req := httptest.NewRequest(ep.method, ep.path, strings.NewReader("{}"))
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s %s status=%d, want 400", ep.method, ep.path, rec.Code)
+		}
 	}
 }
 

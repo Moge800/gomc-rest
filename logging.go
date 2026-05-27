@@ -154,7 +154,7 @@ func logRequests(h http.Handler) http.Handler {
 			"remote", r.RemoteAddr,
 			"method", r.Method,
 			"path", r.URL.Path,
-			"query", r.URL.RawQuery,
+			"query", capLogQuery(r.URL.RawQuery),
 			"status", rec.status,
 			"duration", time.Since(start).Round(time.Millisecond),
 		}
