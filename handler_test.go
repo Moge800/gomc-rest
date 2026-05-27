@@ -1438,6 +1438,29 @@ func TestHandleMetricsLatencyRounding(t *testing.T) {
 	}
 }
 
+func TestNoParamEndpointsRejectUnknownParams(t *testing.T) {
+	// All no-param endpoints must return 400 for any unknown query parameter.
+	mux := newTestMux(t)
+	endpoints := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/health?foo=bar"},
+		{http.MethodGet, "/metrics?foo=bar"},
+		{http.MethodGet, "/version?foo=bar"},
+		{http.MethodGet, "/info?foo=bar"},
+		{http.MethodGet, "/openapi.yaml?foo=bar"},
+	}
+	for _, ep := range endpoints {
+		req := httptest.NewRequest(ep.method, ep.path, nil)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s %s status=%d, want 400", ep.method, ep.path, rec.Code)
+		}
+	}
+}
+
 // newTestMux builds the same mux as main(), using a test PLCQueue.
 func newTestMux(t *testing.T) *http.ServeMux {
 	t.Helper()
