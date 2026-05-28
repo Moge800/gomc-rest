@@ -156,7 +156,7 @@ func logRequests(h http.Handler) http.Handler {
 			"path", r.URL.Path,
 			"query", capLogQuery(r.URL.RawQuery),
 			"status", rec.status,
-			"duration", time.Since(start).Round(time.Millisecond),
+			"duration_ms", math.Round(float64(time.Since(start).Nanoseconds())/1e6*100)/100,
 		}
 		if ms, ok := plcLatencyMs(r.Context()); ok {
 			attrs = append(attrs, "plc_latency_ms", ms)
