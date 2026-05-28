@@ -272,43 +272,18 @@ paths:
               schema:
                 type: object
                 required:
-                  - request_count
-                  - reconnect_count
-                  - plc_error_count
-                  - avg_latency_ms
-                  - recent_avg_latency_ms
-                  - queue_length
                   - client_request_count
                   - busy_count
                   - client_avg_latency_ms
                   - client_recent_avg_latency_ms
+                  - queue_length
+                  - request_count
+                  - reconnect_count
+                  - timeout_count
+                  - plc_error_count
+                  - avg_latency_ms
+                  - recent_avg_latency_ms
                 properties:
-                  request_count:
-                    type: integer
-                    description: Total PLC operations attempted
-                    example: 1234
-                  reconnect_count:
-                    type: integer
-                    description: Total reconnect attempts
-                    example: 2
-                  plc_error_count:
-                    type: integer
-                    description: Total PLC errors (connection + protocol)
-                    example: 5
-                  avg_latency_ms:
-                    type: number
-                    format: double
-                    description: Average PLC wire latency since process start, in milliseconds (2 decimal places)
-                    example: 8.33
-                  recent_avg_latency_ms:
-                    type: number
-                    format: double
-                    description: Average PLC wire latency for the most recent 100 requests, in milliseconds (2 decimal places)
-                    example: 7.12
-                  queue_length:
-                    type: integer
-                    description: Current number of pending operations in the queue
-                    example: 0
                   client_request_count:
                     type: integer
                     description: Total HTTP requests to PLC endpoints (including busy rejections)
@@ -327,6 +302,36 @@ paths:
                     format: double
                     description: Average client-visible latency for the most recent 100 non-busy requests, in milliseconds (2 decimal places)
                     example: 28.1
+                  queue_length:
+                    type: integer
+                    description: Current number of pending operations in the queue
+                    example: 0
+                  request_count:
+                    type: integer
+                    description: Total PLC operations attempted
+                    example: 1234
+                  reconnect_count:
+                    type: integer
+                    description: Total reconnect attempts
+                    example: 2
+                  timeout_count:
+                    type: integer
+                    description: Requests that returned context.DeadlineExceeded (timed out before, during, or after queuing)
+                    example: 3
+                  plc_error_count:
+                    type: integer
+                    description: Total PLC errors (connection + protocol)
+                    example: 5
+                  avg_latency_ms:
+                    type: number
+                    format: double
+                    description: Average PLC wire latency since process start, in milliseconds (2 decimal places)
+                    example: 8.33
+                  recent_avg_latency_ms:
+                    type: number
+                    format: double
+                    description: Average PLC wire latency for the most recent 100 requests, in milliseconds (2 decimal places)
+                    example: 7.12
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
 

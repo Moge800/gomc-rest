@@ -172,6 +172,9 @@ func (q *PLCQueue) exec(ctx context.Context, fn func() (any, error)) (any, error
 	} else {
 		q.client.recordLatency(time.Since(start).Nanoseconds())
 	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		q.plc.metrics.timeouts.Add(1)
+	}
 	return value, err
 }
 
@@ -455,15 +458,19 @@ func (q *PLCQueue) Metrics() map[string]any {
 	}
 
 	return map[string]any{
-		"request_count":                reqs,
-		"reconnect_count":              m.reconnects.Load(),
-		"plc_error_count":              m.plcErrors.Load(),
-		"avg_latency_ms":               avgMs,
-		"recent_avg_latency_ms":        m.recentAvgMs(),
-		"queue_length":                 len(q.work.jobs),
+		// HTTP client layer
 		"client_request_count":         cReqs,
 		"busy_count":                   cBusy,
 		"client_avg_latency_ms":        cAvgMs,
 		"client_recent_avg_latency_ms": c.recentAvgMs(),
+		// queue
+		"queue_length": len(q.work.jobs),
+		// PLC layer
+		"request_count":         reqs,
+		"reconnect_count":       m.reconnects.Load(),
+		"timeout_count":         m.timeouts.Load(),
+		"plc_error_count":       m.plcErrors.Load(),
+		"avg_latency_ms":        avgMs,
+		"recent_avg_latency_ms": m.recentAvgMs(),
 	}
 }
