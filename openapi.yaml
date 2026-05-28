@@ -332,10 +332,6 @@ paths:
                     format: double
                     description: Average PLC wire latency for the most recent 100 requests, in milliseconds (2 decimal places)
                     example: 7.12
-                  queue_length:
-                    type: integer
-                    description: Current number of pending operations in the queue
-                    example: 0
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
 
