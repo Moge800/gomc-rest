@@ -148,6 +148,36 @@ func TestLogRequestsPLCLatency(t *testing.T) {
 	})
 }
 
+func TestLogRequestsDurationMs(t *testing.T) {
+	var capturedAttrs []slog.Attr
+	h := &attrCaptureHandler{attrs: &capturedAttrs}
+	orig := slog.Default()
+	slog.SetDefault(slog.New(h))
+	t.Cleanup(func() { slog.SetDefault(orig) })
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	logRequests(handler).ServeHTTP(httptest.NewRecorder(), req)
+
+	var foundDurationMs bool
+	for _, a := range capturedAttrs {
+		if a.Key == "duration_ms" {
+			foundDurationMs = true
+			if _, ok := a.Value.Any().(float64); !ok {
+				t.Errorf("duration_ms value type = %T, want float64", a.Value.Any())
+			}
+		}
+		if a.Key == "duration" {
+			t.Error("old key 'duration' found; expected 'duration_ms'")
+		}
+	}
+	if !foundDurationMs {
+		t.Error("duration_ms not found in log attrs")
+	}
+}
+
 // levelCaptureHandler captures the level of the last slog record it receives.
 type levelCaptureHandler struct{ level *slog.Level }
 
