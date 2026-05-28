@@ -11,6 +11,7 @@ const recentWindow = 100
 type plcMetrics struct {
 	requests   atomic.Int64 // total PLC operations attempted
 	reconnects atomic.Int64 // total reconnect attempts
+	timeouts   atomic.Int64 // context.DeadlineExceeded while waiting for PLC op
 	plcErrors  atomic.Int64 // total PLC errors (connection + protocol)
 	totalNs    atomic.Int64 // cumulative nanoseconds for avg latency
 
