@@ -8,6 +8,8 @@ PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使�
 
 追加依存なしの Python クライアントライブラリもあります: [gomc-rest-client (PyPI)](https://pypi.org/project/gomc-rest-client/)
 
+解説記事: [Qiita](https://qiita.com/Moge800/items/7e97a5cfbd76cb111bef)
+
 ## 機能
 
 - `/read` でワードデバイスとビットデバイスを読み取り。
