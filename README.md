@@ -38,6 +38,21 @@ Download the latest `gomc-rest.exe` from the [Releases](https://github.com/moge8
 
 Published releases provide the Windows binary as `gomc-rest.exe`. Source builds use the output name from the build command below.
 
+## API Documentation UI (docs.html)
+
+`docs.html` is available as a release asset alongside `gomc-rest.exe`.
+
+**Works offline and in closed networks — no internet connection required.**
+All JavaScript and CSS are bundled into the single HTML file.
+
+**Usage:**
+1. Download `docs.html` from the [Releases](https://github.com/moge800/gomc-rest/releases) page
+2. Open `docs.html` in any browser (double-click or `file://` URL)
+3. Enter the gomc-rest URL in the input box (e.g. `http://192.168.0.10:8080`)
+4. Click **Load**
+
+The UI fetches the OpenAPI spec from `/openapi.yaml` on the specified gomc-rest instance and renders it as interactive Swagger UI.
+
 ## Quick Start (Windows)
 
 ### 1. Create a batch file
