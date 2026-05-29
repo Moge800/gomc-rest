@@ -51,7 +51,9 @@ All JavaScript and CSS are bundled into the single HTML file.
 3. Enter the gomc-rest URL in the input box (e.g. `http://192.168.0.10:8080`)
 4. Click **Load**
 
-The UI fetches the OpenAPI spec from `/openapi.yaml` on the specified gomc-rest instance and renders it as interactive Swagger UI.
+The UI fetches the OpenAPI spec from `/openapi.yaml` on the specified gomc-rest instance and renders it as Swagger UI for browsing the API.
+
+> **Note:** `docs.html` is a spec viewer. Swagger UI's "Try it out" (executing requests against the live API) is blocked by the browser's CORS policy when the page is opened via `file://`, because the data endpoints (`/read`, `/write`, …) are not cross-origin enabled. To use "Try it out", serve `docs.html` from the same origin as the gomc-rest instance.
 
 ## Quick Start (Windows)
 

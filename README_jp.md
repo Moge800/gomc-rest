@@ -51,7 +51,9 @@ JavaScript・CSS はすべて HTML ファイル内にインライン化されて
 3. 入力欄に gomc-rest の URL を入力（例：`http://192.168.0.10:8080`）
 4. **Load** ボタンをクリック
 
-指定した gomc-rest の `/openapi.yaml` を取得し、Swagger UI としてインタラクティブに表示します。
+指定した gomc-rest の `/openapi.yaml` を取得し、Swagger UI として API を閲覧できます。
+
+> **注意:** `docs.html` は spec のビューアです。Swagger UI の「Try it out」（実 API へのリクエスト実行）は、`file://` で開いた場合ブラウザの CORS ポリシーによりブロックされます（データ系エンドポイント `/read`・`/write` などはクロスオリジン非対応のため）。「Try it out」を使う場合は、`docs.html` を gomc-rest と同一オリジンから配信してください。
 
 ## クイックスタート（Windows）
 
