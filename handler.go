@@ -202,6 +202,7 @@ func handleOpenAPI(spec []byte) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(spec)
 	}

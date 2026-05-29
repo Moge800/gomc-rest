@@ -32,3 +32,4 @@ jobs:
           files: |
             gomc-rest.exe
             checksums.txt
+            docs/docs.html
