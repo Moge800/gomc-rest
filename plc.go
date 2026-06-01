@@ -68,8 +68,7 @@ func newConfiguredPLCClient(cfg ServerConfig) *PLCClient {
 	}
 }
 
-func (p *PLCClient) reconnect() error {
-	p.metrics.reconnects.Add(1)
+func (p *PLCClient) connect() error {
 	c, err := p.newConnection()
 	if err != nil {
 		return err
@@ -80,6 +79,11 @@ func (p *PLCClient) reconnect() error {
 	}
 	p.conn = c
 	return nil
+}
+
+func (p *PLCClient) reconnect() error {
+	p.metrics.reconnects.Add(1)
+	return p.connect()
 }
 
 func (p *PLCClient) newConnection() (plcDialer, error) {
@@ -100,7 +104,7 @@ func (p *PLCClient) newConnection() (plcDialer, error) {
 func (p *PLCClient) initialConnect() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if err := p.reconnect(); err != nil {
+	if err := p.connect(); err != nil {
 		slog.Warn("PLC initial connect failed, will retry on first request", "error", err)
 		return
 	}

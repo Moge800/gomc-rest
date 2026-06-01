@@ -312,7 +312,7 @@ paths:
                     example: 1234
                   reconnect_count:
                     type: integer
-                    description: Total reconnect attempts
+                    description: Total reconnect attempts (excludes initial connect at startup)
                     example: 2
                   timeout_count:
                     type: integer
