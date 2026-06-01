@@ -40,23 +40,6 @@ PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使�
 
 公開リリースでは Windows 用バイナリ名を `gomc-rest.exe` としています。ソースからビルドする場合は、下記のビルドコマンドで指定した出力名になります。
 
-## API ドキュメント UI（docs.html）
-
-`docs.html` は `gomc-rest.exe` と同じリリースページからダウンロードできます。
-
-**インターネット接続不要・閉域ネットワーク対応**
-JavaScript・CSS はすべて HTML ファイル内にインライン化されています。
-
-**使い方：**
-1. [Releases](https://github.com/moge800/gomc-rest/releases) ページから `docs.html` をダウンロード
-2. ブラウザで `docs.html` を開く（ダブルクリックまたは `file://` URL）
-3. 入力欄に gomc-rest の URL を入力（例：`http://192.168.0.10:8080`）
-4. **Load** ボタンをクリック
-
-指定した gomc-rest の `/openapi.yaml` を取得し、Swagger UI として API を閲覧できます。
-
-> **注意:** `docs.html` は spec のビューアです。Swagger UI の「Try it out」（実 API へのリクエスト実行）は、`file://` で開いた場合ブラウザの CORS ポリシーによりブロックされます（データ系エンドポイント `/read`・`/write` などはクロスオリジン非対応のため）。「Try it out」を使う場合は、`docs.html` を gomc-rest と同一オリジンから配信してください。
-
 ## クイックスタート（Windows）
 
 ### 1. バッチファイルを作成する
