@@ -30,6 +30,9 @@ go.work.sum
 # Compiled binary (no extension on Linux/macOS)
 gomc-rest
 
+# Generated Windows resource (icon embed)
+resource_windows_amd64.syso
+
 # Editor/IDE
 # .idea/
 # .vscode/
