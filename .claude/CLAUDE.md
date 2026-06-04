@@ -60,15 +60,52 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Record Decisions & Docs
+
+**Keep planning and decisions in `.docs/` — update them as you go, not at the end.**
+
+- `.docs/` is **private** (git-ignored). Never reference it from public files (README, etc.).
+  Public assets (e.g. screenshots) go in a published folder like `assets/`.
+- At every meaningful decision point, append to **`.docs/decisions.md`** (newest first):
+  *what* was decided, *why*, and any rejected alternatives. One short entry per change is enough.
+- Keep **`.docs/plan.md`** in sync when scope or approach changes.
+- Record toolchain versions and update commands in **`.docs/versions.md`**; refresh after upgrades.
+- When you finish a change, state what you verified (build/test/log) and note anything left unverified.
+
+The test: someone reading `.docs/decisions.md` later can understand *why* the code looks the way it does.
+
+## 6. Project Context
+
+- **gomc-rest-gui** is a lightweight debugging GUI for [gomc-rest](https://github.com/Moge800/gomc-rest)
+  (Mitsubishi PLC REST gateway). It is a standalone HTTP client; **never modify or embed gomc-rest**.
+- Stack: **Wails v2 (Go) + React/TypeScript**. Go backend in `app.go` / `client_*.go`;
+  UI in `frontend/src/` (tabs in `frontend/src/tabs/`, i18n in `frontend/src/i18n/`).
+- UI is **bilingual (ja/en)** — add new strings to **both** `ja.ts` and `en.ts`.
+- After changing Go bound methods, run `wails generate module`. Verify with `wails build`.
+- Target is a single Windows `.exe` for closed/air-gapped networks.
+
+## 7. Git Workflow
+
+**Do not push directly to `main`** (except when the user explicitly instructs it for a
+specific change — see below). Always work on a branch and merge via Pull Request.
+
+1. Branch off `main`: `git switch -c feat/<topic>` (or `fix/<topic>`, `chore/<topic>`).
+2. Commit work on that branch and push it (`git push -u origin <branch>`).
+3. Open a PR: `gh pr create` (clear title + summary; reference what was verified).
+4. **After the PR is merged** (by the maintainer), return to main and sync:
+   `git switch main && git pull` (then delete the merged branch if desired).
+- Do not force-push or rewrite history on `main`.
+
+**Merging and releasing are the maintainer's job, not the agent's.**
+- The agent prepares branches and PRs only; it must **not** merge PRs.
+- The agent must **not** create releases or tags (`git tag` / `gh release`). It only
+  **proposes** a version number (pre-1.0: feature → minor `0.x.0`, fix/build/docs → patch `0.x.y`).
+- Direct pushes to `main` only when the user explicitly instructs it for that change.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
-
----
-**Git Workflow**
- - Never push directly to main.
- - Always create a feature branch and open a PR, unless the user explicitly says to push directly.
 
 ---
 **Stream Timeout Prevention**
