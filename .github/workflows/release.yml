@@ -29,7 +29,7 @@ jobs:
       - name: Generate Windows resource
         run: |
           convert assets/appicon.png -define icon:auto-resize=256,48,32,16 assets/appicon.ico
-          ~/go/bin/rsrc -ico assets/appicon.ico -o resource_windows.syso
+          $(go env GOPATH)/bin/rsrc -arch amd64 -ico assets/appicon.ico -o resource_windows.syso
 
       - name: Build (Windows amd64)
         run: GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-X main.version=${GITHUB_REF_NAME}" -o gomc-rest.exe .
