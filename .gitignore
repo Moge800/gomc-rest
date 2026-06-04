@@ -31,7 +31,7 @@ go.work.sum
 gomc-rest
 
 # Generated Windows resource (icon embed)
-resource_windows.syso
+resource_windows_amd64.syso
 
 # Editor/IDE
 # .idea/
