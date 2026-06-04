@@ -8,6 +8,8 @@ PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使�
 
 追加依存なしの Python クライアントライブラリもあります: [gomc-rest-client (PyPI)](https://pypi.org/project/gomc-rest-client/)
 
+軽量なデバッグ用 GUI もあります: [gomc-rest-gui](https://github.com/Moge800/gomc-rest-gui) — curl の代わりにシンプルな画面から gomc-rest のエンドポイントを操作できる、単体動作の HTTP クライアント（Wails + React）です。
+
 解説記事: [Qiita](https://qiita.com/Moge800/items/7e97a5cfbd76cb111bef)
 
 ## 機能

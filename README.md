@@ -8,6 +8,8 @@ The PLC transport is provided by [gomcprotocol](https://github.com/moge800/gomcp
 
 A Python client library with no extra dependencies is also available: [gomc-rest-client on PyPI](https://pypi.org/project/gomc-rest-client/)
 
+A lightweight debugging GUI is also available: [gomc-rest-gui](https://github.com/Moge800/gomc-rest-gui) — a standalone HTTP client (Wails + React) for exercising gomc-rest's endpoints from a simple screen instead of curl.
+
 ## Features
 
 - Read word and bit devices through a simple `/read` endpoint.
