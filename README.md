@@ -2,6 +2,8 @@
 
 [日本語 README](README_jp.md)
 
+![gomc-rest](assets/appicon.png)
+
 `gomc-rest` is a small REST API server and HTTP gateway for Mitsubishi Electric PLCs using MC protocol 3E or 4E frames. It sits between HTTP clients and a PLC, brokering reads and writes for device strings such as `D100.0`, `W100`, and `M0` while returning JSON values with automatic conversion: word devices become integers and bit devices become booleans.
 
 The PLC transport is provided by [gomcprotocol](https://github.com/moge800/gomcprotocol). The server uses only the Go standard library for HTTP handling.
