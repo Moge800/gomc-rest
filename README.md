@@ -42,9 +42,13 @@ Recommended deployment:
 
 ## Download
 
-Download the latest `gomc-rest.exe` from the [Releases](https://github.com/moge800/gomc-rest/releases) page.
+Download the latest release from the [Releases](https://github.com/moge800/gomc-rest/releases) page.
 
-Published releases provide the Windows binary as `gomc-rest.exe`. Source builds use the output name from the build command below.
+| Platform | File |
+| --- | --- |
+| Windows (amd64) | `gomc-rest.exe` |
+| Linux (amd64) | `gomc-rest-linux-amd64` |
+| Linux (arm64 / Raspberry Pi 5) | `gomc-rest-linux-arm64` |
 
 ## Quick Start (Windows)
 
