@@ -35,12 +35,20 @@ jobs:
       - name: Build (Windows amd64)
         run: GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-X main.version=${GITHUB_REF_NAME}" -o gomc-rest.exe .
 
+      - name: Build (Linux amd64)
+        run: GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-X main.version=${GITHUB_REF_NAME}" -o gomc-rest-linux-amd64 .
+
+      - name: Build (Linux arm64)
+        run: GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-X main.version=${GITHUB_REF_NAME}" -o gomc-rest-linux-arm64 .
+
       - name: Generate checksums
-        run: sha256sum gomc-rest.exe > checksums.txt
+        run: sha256sum gomc-rest.exe gomc-rest-linux-amd64 gomc-rest-linux-arm64 > checksums.txt
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             gomc-rest.exe
+            gomc-rest-linux-amd64
+            gomc-rest-linux-arm64
             checksums.txt

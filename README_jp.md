@@ -44,9 +44,13 @@ PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使�
 
 ## ダウンロード
 
-[Releases](https://github.com/moge800/gomc-rest/releases) ページから最新の `gomc-rest.exe` をダウンロードしてください。
+[Releases](https://github.com/moge800/gomc-rest/releases) ページから最新リリースをダウンロードしてください。
 
-公開リリースでは Windows 用バイナリ名を `gomc-rest.exe` としています。ソースからビルドする場合は、下記のビルドコマンドで指定した出力名になります。
+| プラットフォーム | ファイル |
+| --- | --- |
+| Windows (amd64) | `gomc-rest.exe` |
+| Linux (amd64) | `gomc-rest-linux-amd64` |
+| Linux (arm64 / Raspberry Pi 5) | `gomc-rest-linux-arm64` |
 
 ## クイックスタート（Windows）
 
