@@ -8,7 +8,7 @@
 [![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](#ダウンロード)
 
-`gomc-rest` は、三菱電機 PLC（MC プロトコル 3E / 4E フレーム）向けの小さな REST API サーバー兼 HTTP ゲートウェイです。HTTP クライアントと PLC の間に入り、`D100.0`、`W100`、`M0` のようなデバイス文字列を指定した読み書きを仲介しつつ、ワードデバイスは整数、ビットデバイスは真偽値として JSON に自動変換します。
+`gomc-rest` は、三菱電機 PLC（MC プロトコル 3E / 4E フレーム）向けの小さな REST API サーバー属 HTTP ゲートウェイです。HTTP クライアントと PLC の間に入り、`D100.0`、`W100`、`M0` のようなデバイス文字列を指定した読み書きを仓介しつつ、ワードデバイスは整数、ビットデバイスは真偽値として JSON に自動変換します。
 
 PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使用します。HTTP サーバー部分は Go の標準ライブラリのみで実装されています。
 
@@ -82,7 +82,7 @@ pause
 http://localhost:8080/health
 ```
 
-以下のように返ってくれば正常に起動しています。
+以下のように返ってくれれば正常に起動しています。
 
 ```json
 {"plc_status":"ok","connected":true}
@@ -158,7 +158,7 @@ Windows 用リリースバイナリの場合:
 .\gomc-rest.exe -host 192.168.0.1 -port 5007 -mode binary -listen 127.0.0.1:8080 -readonly
 ```
 
-起動時に PLC への接続を試行します。PLC に到達できない場合でも起動は継続し、最初の PLC 要求時に再接続します。
+起動時に PLC への接続を試行します。PLC に到達できない場合でも起動は続行し、最初の PLC 要求時に再接続します。
 
 ## ソースからビルド
 
@@ -228,7 +228,7 @@ go build -o gomc-rest .
 - ブール型 query フラグ（`dword`、`sint`、`force`）は query 文字列の値が厳密に `true` のときだけ有効です。
 - `GET /health` は PLC 未接続時でも常に HTTP `200` を返します。
 - `/remote/reset` は PLC 側で TCP 接続が閉じられるため、実行後に接続をクリアします。
-- `/metrics` の PLC 系フィールド（`request_count`、`avg_latency_ms`、`recent_avg_latency_ms`）は PLC との通信時間のみを計測します。クライアント系フィールド（`client_request_count`、`client_avg_latency_ms`、`client_recent_avg_latency_ms`）はキュー待ち時間を含むクライアント視点の往復時間を計測します。`busy_count` はキュー満杯で弾かれたリクエスト数で、クライアントレイテンシーの平均には含みません。
+- `/metrics` の PLC 系フィールド（`request_count`、`avg_latency_ms`、`recent_avg_latency_ms`）は PLC との通信時間のみを計測します。クライアント系フィールド（`client_request_count`、`client_avg_latency_ms`、`client_recent_avg_latency_ms`）はキュー待ち時間を含むクライアント視点の往復時間を計測します。`busy_count` はキュー満杯で弾かれたリクエスト数で、クライアントレイテンシーの平均には含まない。
 
 ## デバイスアドレス
 
@@ -248,14 +248,14 @@ go build -o gomc-rest .
 ワードデバイスのアドレスに `.N`（16進1桁、`0`〜`F`）を付けると、第 `N` ビットから連続する 1 ビット以上を読み書きできます。
 
 ```
-D3500.0   ← D3500 の第 0 ビット（最下位）
-D3500.F   ← D3500 の第 15 ビット（最上位）
+D100.0   ← D100 の第 0 ビット（最下位）
+D100.F   ← D100 の第 15 ビット（最上位）
 W1D.7     ← W1D（16進アドレス 0x1D）の第 7 ビット
 ```
 
-- 読み取り: `count` を付けると第 `N` ビットから連続するビットを返します。`GET /read?addr=D3500.1&count=5` は D3500 の第 1〜5 ビットを `{"values": [true, false, ...]}` として返します。
+- 読み取り: `count` を付けると第 `N` ビットから連続するビットを返します。`GET /read?addr=D100.1&count=5` は D100 の第 1〜5 ビットを `{"values": [true, false, ...]}` として返します。
 - 書き込み: body は真偽値の配列で、第 `N` ビットから順に適用します。`{"values": [true, false, true]}` は第 `N`・`N+1`・`N+2` ビットを設定します。内部で 1 回の read-modify-write を実行します。
-- ビットは同一ワード内に収める必要があります。`N + count`（書き込みは `N + 要素数`）が `16` を超えると `400 bad_request` になります。例えば `D3500.F&count=2` は拒否されます。
+- ビットは同一ワード内に収める必要があります。`N + count`（書き込みは `N + 要素数`）が `16` を超えると `400 bad_request` になります。例えば `D100.F&count=2` は拒否されます。
 - `dword=true` または `sint=true` との組み合わせは `400 bad_request` になります。
 - ビットデバイス（`X`、`M` など）に `.N` を付けると `400 bad_request` になります。
 
