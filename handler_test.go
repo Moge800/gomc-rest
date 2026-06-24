@@ -595,8 +595,9 @@ func TestHandleReadBitAccessRejectsBitDevice(t *testing.T) {
 	}
 }
 
-func TestHandleReadBitAccessRejectsCount(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.0&count=2", nil)
+func TestHandleReadBitAccessRejectsWordBoundaryExceeded(t *testing.T) {
+	// bit=0xF(15) + count=2 = 17 > 16: must reject
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.F&count=2", nil)
 	rec := httptest.NewRecorder()
 
 	handleRead(newTestPLCQueue(t))(rec, req)
@@ -639,8 +640,9 @@ func TestHandleWriteBitAccessRejectsDword(t *testing.T) {
 	}
 }
 
-func TestHandleWriteBitAccessRejectsMultipleValues(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.0", strings.NewReader(`{"values":[true,false]}`))
+func TestHandleWriteBitAccessRejectsWordBoundaryExceeded(t *testing.T) {
+	// bit=0xF(15) + 2 values = 17 > 16: must reject
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.F", strings.NewReader(`{"values":[true,false]}`))
 	rec := httptest.NewRecorder()
 
 	handleWrite(newTestPLCQueue(t), false)(rec, req)
