@@ -1812,7 +1812,7 @@ func TestHandleRandomRead(t *testing.T) {
 
 	t.Run("truncates RawQuery at maxLogQuery", func(t *testing.T) {
 		var sb strings.Builder
-		sb.WriteString(`{"words":["`)
+		sb.WriteString(`{"words":[`)
 		for i := 0; i < 50; i++ {
 			if i > 0 {
 				sb.WriteByte(',')
