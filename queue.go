@@ -267,10 +267,10 @@ func (q *PLCQueue) WriteBits(ctx context.Context, device string, start int, valu
 	return err
 }
 
-func (q *PLCQueue) ReadWordBit(ctx context.Context, device string, addr, bit int) (bool, error) {
+func (q *PLCQueue) ReadWordBits(ctx context.Context, device string, addr, bit, count int) ([]bool, error) {
 	t := time.Now()
 	value, err := q.exec(ctx, func() (any, error) {
-		var result bool
+		var result []bool
 		doErr := q.plc.do(func(c plcConnection) error {
 			plcStart := time.Now()
 			words, readErr := c.ReadWords(device, addr, 1)
@@ -278,19 +278,22 @@ func (q *PLCQueue) ReadWordBit(ctx context.Context, device string, addr, bit int
 			if readErr != nil {
 				return readErr
 			}
-			result = (words[0]>>uint(bit))&1 == 1
+			result = make([]bool, count)
+			for i := range count {
+				result[i] = (words[0]>>uint(bit+i))&1 == 1
+			}
 			return nil
 		})
 		return result, doErr
 	})
 	logPLCOp(device+strconv.Itoa(addr)+"."+strconv.Itoa(bit), time.Since(t), err)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	return value.(bool), nil
+	return value.([]bool), nil
 }
 
-func (q *PLCQueue) WriteWordBit(ctx context.Context, device string, addr, bit int, value bool) error {
+func (q *PLCQueue) WriteWordBits(ctx context.Context, device string, addr, bit int, values []bool) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {
 		doErr := q.plc.do(func(c plcConnection) error {
@@ -300,10 +303,12 @@ func (q *PLCQueue) WriteWordBit(ctx context.Context, device string, addr, bit in
 			if err != nil {
 				return err
 			}
-			if value {
-				words[0] |= 1 << uint(bit)
-			} else {
-				words[0] &^= 1 << uint(bit)
+			for i, v := range values {
+				if v {
+					words[0] |= 1 << uint(bit+i)
+				} else {
+					words[0] &^= 1 << uint(bit+i)
+				}
 			}
 			return c.WriteWords(device, addr, words)
 		})

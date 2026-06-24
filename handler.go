@@ -395,16 +395,16 @@ func handleRead(plc *PLCQueue) http.HandlerFunc {
 				writeErr(w, http.StatusBadRequest, "bad_request", "dword and sint flags are not supported with bit access")
 				return
 			}
-			if count != 1 {
-				writeErr(w, http.StatusBadRequest, "bad_request", "count must be 1 for bit access")
+			if da.Bit+count > 16 {
+				writeErr(w, http.StatusBadRequest, "bad_request", fmt.Sprintf("bit access at bit %d with count %d exceeds 16-bit word boundary", da.Bit, count))
 				return
 			}
-			val, err := plc.ReadWordBit(r.Context(), da.Device, da.Addr, da.Bit)
+			vals, err := plc.ReadWordBits(r.Context(), da.Device, da.Addr, da.Bit, count)
 			if err != nil {
 				writePLCErr(w, err)
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]any{"values": []bool{val}})
+			writeJSON(w, http.StatusOK, map[string]any{"values": vals})
 			return
 		}
 
@@ -524,11 +524,15 @@ func handleWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 				return
 			}
 			var vals []bool
-			if err := json.Unmarshal(body.Values, &vals); err != nil || len(vals) != 1 {
-				writeErr(w, http.StatusBadRequest, "bad_request", "values must be an array of exactly one boolean for bit access")
+			if err := json.Unmarshal(body.Values, &vals); err != nil || len(vals) == 0 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "values must be an array of booleans for bit access")
 				return
 			}
-			if err := plc.WriteWordBit(r.Context(), da.Device, da.Addr, da.Bit, vals[0]); err != nil {
+			if da.Bit+len(vals) > 16 {
+				writeErr(w, http.StatusBadRequest, "bad_request", fmt.Sprintf("bit access at bit %d with %d values exceeds 16-bit word boundary", da.Bit, len(vals)))
+				return
+			}
+			if err := plc.WriteWordBits(r.Context(), da.Device, da.Addr, da.Bit, vals); err != nil {
 				writePLCErr(w, err)
 				return
 			}

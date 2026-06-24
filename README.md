@@ -243,7 +243,7 @@ The numeric address must be a non-negative integer. Unknown devices, missing num
 
 ### Word Device Bit Access
 
-Append `.N` (single hex digit, `0`–`F`) to a word device address to read or write a single bit within the 16-bit register.
+Append `.N` (single hex digit, `0`–`F`) to a word device address to read or write one or more consecutive bits within the 16-bit register, starting at bit `N`.
 
 ```
 D3500.0   ← bit 0 (LSB) of D3500
@@ -251,10 +251,10 @@ D3500.F   ← bit 15 (MSB) of D3500
 W1D.7     ← bit 7 of W1D (hex address 0x1D)
 ```
 
-- Read returns `{"values": [true]}` or `{"values": [false]}`.
-- Write body must be `{"values": [true]}` or `{"values": [false]}` (exactly one element). The server performs a read-modify-write internally.
+- Read with `count` returns consecutive bits starting at `N`: `GET /read?addr=D3500.1&count=5` returns bits 1–5 of D3500 as `{"values": [true, false, ...]}`.
+- Write body is an array of booleans applied to consecutive bits starting at `N`: `{"values": [true, false, true]}` sets bits `N`, `N+1`, `N+2`. The server performs a single read-modify-write internally.
+- Bits stay within one word: `N + count` (or `N + len(values)`) must not exceed `16`, otherwise `400 bad_request`. For example `D3500.F&count=2` is rejected.
 - `dword=true` or `sint=true` combined with bit access returns `400 bad_request`.
-- `count` must be 1; `count=2` or higher returns `400 bad_request`.
 - Appending `.N` to a bit device (e.g. `M0.0`) returns `400 bad_request`.
 
 ## Error Responses
