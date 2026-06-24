@@ -597,7 +597,7 @@ func TestHandleReadBitAccessRejectsBitDevice(t *testing.T) {
 
 func TestHandleReadBitAccessRejectsWordBoundaryExceeded(t *testing.T) {
 	// bit=0xF(15) + count=2 = 17 > 16: must reject
-	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.F&count=2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100.F&count=2", nil)
 	rec := httptest.NewRecorder()
 
 	handleRead(newTestPLCQueue(t))(rec, req)
@@ -608,7 +608,7 @@ func TestHandleReadBitAccessRejectsWordBoundaryExceeded(t *testing.T) {
 }
 
 func TestHandleReadBitAccessRejectsDword(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.0&dword=true", nil)
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100.0&dword=true", nil)
 	rec := httptest.NewRecorder()
 
 	handleRead(newTestPLCQueue(t))(rec, req)
@@ -630,7 +630,7 @@ func TestHandleWriteBitAccessRejectsBitDevice(t *testing.T) {
 }
 
 func TestHandleWriteBitAccessRejectsDword(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.0&dword=true", strings.NewReader(`{"values":[true]}`))
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100.0&dword=true", strings.NewReader(`{"values":[true]}`))
 	rec := httptest.NewRecorder()
 
 	handleWrite(newTestPLCQueue(t), false)(rec, req)
@@ -642,7 +642,7 @@ func TestHandleWriteBitAccessRejectsDword(t *testing.T) {
 
 func TestHandleWriteBitAccessRejectsWordBoundaryExceeded(t *testing.T) {
 	// bit=0xF(15) + 2 values = 17 > 16: must reject
-	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.F", strings.NewReader(`{"values":[true,false]}`))
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100.F", strings.NewReader(`{"values":[true,false]}`))
 	rec := httptest.NewRecorder()
 
 	handleWrite(newTestPLCQueue(t), false)(rec, req)
@@ -705,10 +705,10 @@ func newMockPLCQueue(t *testing.T, words map[string]uint16) *PLCQueue {
 }
 
 func TestHandleReadBitAccessReturnsBoolean(t *testing.T) {
-	// D3500 = 0b0000_0000_0000_0101 → bit0=true, bit1=false, bit2=true
-	q := newMockPLCQueue(t, map[string]uint16{"D3500": 0b101})
+	// D100 = 0b0000_0000_0000_0101 → bit0=true, bit1=false, bit2=true
+	q := newMockPLCQueue(t, map[string]uint16{"D100": 0b101})
 
-	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.0", nil)
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100.0", nil)
 	rec := httptest.NewRecorder()
 	handleRead(q)(rec, req)
 
@@ -725,7 +725,7 @@ func TestHandleReadBitAccessReturnsBoolean(t *testing.T) {
 	}
 
 	// bit1 should be false
-	req2 := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.1", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/read?addr=D100.1", nil)
 	rec2 := httptest.NewRecorder()
 	handleRead(q)(rec2, req2)
 	var body2 map[string]any
@@ -737,10 +737,10 @@ func TestHandleReadBitAccessReturnsBoolean(t *testing.T) {
 }
 
 func TestHandleWriteBitAccessSetsAndClears(t *testing.T) {
-	q := newMockPLCQueue(t, map[string]uint16{"D3500": 0})
+	q := newMockPLCQueue(t, map[string]uint16{"D100": 0})
 
 	// set bit0
-	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.0", strings.NewReader(`{"values":[true]}`))
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100.0", strings.NewReader(`{"values":[true]}`))
 	rec := httptest.NewRecorder()
 	handleWrite(q, false)(rec, req)
 
@@ -749,7 +749,7 @@ func TestHandleWriteBitAccessSetsAndClears(t *testing.T) {
 	}
 
 	// read back: bit0 should be true
-	req2 := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.0", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/read?addr=D100.0", nil)
 	rec2 := httptest.NewRecorder()
 	handleRead(q)(rec2, req2)
 	var body map[string]any
@@ -760,7 +760,7 @@ func TestHandleWriteBitAccessSetsAndClears(t *testing.T) {
 	}
 
 	// clear bit0
-	req3 := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.0", strings.NewReader(`{"values":[false]}`))
+	req3 := httptest.NewRequest(http.MethodPost, "/write?addr=D100.0", strings.NewReader(`{"values":[false]}`))
 	rec3 := httptest.NewRecorder()
 	handleWrite(q, false)(rec3, req3)
 	if rec3.Code != http.StatusOK {
@@ -769,10 +769,10 @@ func TestHandleWriteBitAccessSetsAndClears(t *testing.T) {
 }
 
 func TestHandleReadBitAccessMultiBit(t *testing.T) {
-	// D3500 = 0b0000_0000_0011_0010 → bit1=true, bit2=false, bit3=false, bit4=true, bit5=true
-	q := newMockPLCQueue(t, map[string]uint16{"D3500": 0b110010})
+	// D100 = 0b0000_0000_0011_0010 → bit1=true, bit2=false, bit3=false, bit4=true, bit5=true
+	q := newMockPLCQueue(t, map[string]uint16{"D100": 0b110010})
 
-	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.1&count=5", nil)
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D100.1&count=5", nil)
 	rec := httptest.NewRecorder()
 	handleRead(q)(rec, req)
 
@@ -796,10 +796,10 @@ func TestHandleReadBitAccessMultiBit(t *testing.T) {
 }
 
 func TestHandleWriteBitAccessMultiBit(t *testing.T) {
-	q := newMockPLCQueue(t, map[string]uint16{"D3500": 0})
+	q := newMockPLCQueue(t, map[string]uint16{"D100": 0})
 
 	// set bits 2,3,4 to true,false,true starting at bit2
-	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.2", strings.NewReader(`{"values":[true,false,true]}`))
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100.2", strings.NewReader(`{"values":[true,false,true]}`))
 	rec := httptest.NewRecorder()
 	handleWrite(q, false)(rec, req)
 	if rec.Code != http.StatusOK {
@@ -807,7 +807,7 @@ func TestHandleWriteBitAccessMultiBit(t *testing.T) {
 	}
 
 	// read back bits 2-4: should be true,false,true
-	req2 := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.2&count=3", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/read?addr=D100.2&count=3", nil)
 	rec2 := httptest.NewRecorder()
 	handleRead(q)(rec2, req2)
 	var body map[string]any
@@ -1812,7 +1812,7 @@ func TestHandleRandomRead(t *testing.T) {
 
 	t.Run("truncates RawQuery at maxLogQuery", func(t *testing.T) {
 		var sb strings.Builder
-		sb.WriteString(`{"words":[`)
+		sb.WriteString(`{"words":["`)
 		for i := 0; i < 50; i++ {
 			if i > 0 {
 				sb.WriteByte(',')
