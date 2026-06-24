@@ -352,14 +352,14 @@ paths:
         - name: addr
           in: query
           required: true
-          description: "PLC device address, e.g. `D100`, `M0`, `X1F`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (single hex digit 0–F), e.g. `D3500.0`; count must be 1 and returns `{\"values\":[true]}` or `{\"values\":[false]}`."
+          description: "PLC device address, e.g. `D100`, `M0`, `X1F`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (single hex digit 0–F), e.g. `D3500.0`; with `count` it reads consecutive bits starting at `N` and returns `{\"values\":[true,false,...]}`. Bits must stay within one word (`N + count` ≤ 16)."
           schema:
             type: string
             example: "D100"
         - name: count
           in: query
           required: false
-          description: Number of values to read (default 1, max 1024; max 512 when dword=true; must be 1 for bit access)
+          description: "Number of values to read (default 1, max 1024; max 512 when dword=true). For bit access, reads consecutive bits starting at `N`; `N + count` must not exceed 16."
           schema:
             type: integer
             default: 1
@@ -447,7 +447,7 @@ paths:
         - name: addr
           in: query
           required: true
-          description: "PLC device address, e.g. `D100`, `M0`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (single hex digit 0–F), e.g. `D3500.0`; body must be `{\"values\":[true]}` or `{\"values\":[false]}`."
+          description: "PLC device address, e.g. `D100`, `M0`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (single hex digit 0–F), e.g. `D3500.0`; body is an array of booleans applied to consecutive bits starting at `N`, e.g. `{\"values\":[true,false,true]}`. Bits must stay within one word (`N + len(values)` ≤ 16)."
           schema:
             type: string
             example: "D100"

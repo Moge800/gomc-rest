@@ -768,6 +768,62 @@ func TestHandleWriteBitAccessSetsAndClears(t *testing.T) {
 	}
 }
 
+func TestHandleReadBitAccessMultiBit(t *testing.T) {
+	// D3500 = 0b0000_0000_0011_0010 → bit1=true, bit2=false, bit3=false, bit4=true, bit5=true
+	q := newMockPLCQueue(t, map[string]uint16{"D3500": 0b110010})
+
+	req := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.1&count=5", nil)
+	rec := httptest.NewRecorder()
+	handleRead(q)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	vals, _ := body["values"].([]any)
+	want := []bool{true, false, false, true, true}
+	if len(vals) != len(want) {
+		t.Fatalf("values = %v, want %v", vals, want)
+	}
+	for i, wv := range want {
+		if vals[i] != wv {
+			t.Errorf("values[%d] = %v, want %v", i, vals[i], wv)
+		}
+	}
+}
+
+func TestHandleWriteBitAccessMultiBit(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{"D3500": 0})
+
+	// set bits 2,3,4 to true,false,true starting at bit2
+	req := httptest.NewRequest(http.MethodPost, "/write?addr=D3500.2", strings.NewReader(`{"values":[true,false,true]}`))
+	rec := httptest.NewRecorder()
+	handleWrite(q, false)(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	// read back bits 2-4: should be true,false,true
+	req2 := httptest.NewRequest(http.MethodGet, "/read?addr=D3500.2&count=3", nil)
+	rec2 := httptest.NewRecorder()
+	handleRead(q)(rec2, req2)
+	var body map[string]any
+	_ = json.NewDecoder(rec2.Body).Decode(&body)
+	vals, _ := body["values"].([]any)
+	want := []bool{true, false, true}
+	if len(vals) != len(want) {
+		t.Fatalf("values = %v, want %v", vals, want)
+	}
+	for i, wv := range want {
+		if vals[i] != wv {
+			t.Errorf("values[%d] = %v, want %v", i, vals[i], wv)
+		}
+	}
+}
+
 func TestHandleWriteReadOnlyRejects(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/write?addr=D100", strings.NewReader(`{"values":[1]}`))
 	rec := httptest.NewRecorder()
