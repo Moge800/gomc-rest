@@ -44,10 +44,10 @@ func TestParseAddr(t *testing.T) {
 		{"d100", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 100}, -1}},
 		{" M10 ", ParsedAddr{mc.DeviceAddr{Device: "M", Addr: 10}, -1}},
 		// ビットアクセス（16進1桁 0–F）
-		{"D3500.0", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 3500}, 0}},
-		{"D3500.9", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 3500}, 9}},
-		{"D3500.A", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 3500}, 10}},
-		{"D3500.F", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 3500}, 15}},
+		{"D100.0", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 100}, 0}},
+		{"D100.9", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 100}, 9}},
+		{"D100.A", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 100}, 10}},
+		{"D100.F", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 100}, 15}},
 		{"W10.7", ParsedAddr{mc.DeviceAddr{Device: "W", Addr: 0x10}, 7}},
 		{"d100.3", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 100}, 3}},
 		{"d100.a", ParsedAddr{mc.DeviceAddr{Device: "D", Addr: 100}, 10}},
@@ -77,10 +77,10 @@ func TestParseAddr(t *testing.T) {
 		"X-1",        // X は16進数、負数は無効
 		"XGGGG",      // 16進数として無効
 		"M0.0",       // ビットデバイスにビット指定不可
-		"D3500.10",   // 2文字（10進表記）は不可
-		"D3500.15",   // 2文字（10進表記）は不可
-		"D3500.G",    // 16進として無効
-		"D3500.-1",   // 2文字かつ無効
+		"D100.10",   // 2文字（10進表記）は不可
+		"D100.15",   // 2文字（10進表記）は不可
+		"D100.G",    // 16進として無効
+		"D100.-1",   // 2文字かつ無効
 		"D.0",        // アドレス番号なし
 	}
 
