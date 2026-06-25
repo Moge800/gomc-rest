@@ -352,7 +352,7 @@ paths:
         - name: addr
           in: query
           required: true
-          description: "PLC device address, e.g. `D100`, `M0`, `X1F`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (single hex digit 0–F), e.g. `D100.0`; with `count` it reads consecutive bits starting at `N` and returns `{\"values\":[true,false,...]}`.\ Bits must stay within one word (`N + count` ≤ 16)."
+          description: "PLC device address, e.g. `D100`, `M0`, `X1F`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (single hex digit 0–F), e.g. `D100.0`; with `count` it reads consecutive bits starting at `N` and returns `{\"values\":[true,false,...]}`. Bits must stay within one word (`N + count` ≤ 16)."
           schema:
             type: string
             example: "D100"
