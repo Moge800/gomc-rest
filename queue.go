@@ -389,35 +389,66 @@ func (q *PLCQueue) RemoteReset(ctx context.Context) error {
 
 const maxRandomCount = 255
 
-func (q *PLCQueue) RandomRead(ctx context.Context, words, dwords []mc.DeviceAddr) ([]uint16, []uint32, error) {
+// maxRandomBitReads caps native bit devices in a single /random-read, since each
+// one costs a separate ReadBits round-trip (MC random read has no bit unit).
+const maxRandomBitReads = 16
+
+// RandomRead reads word and dword devices in a single MC random read (0x0403).
+// Native bit devices (bits) have no random-read command, so each is read with an
+// individual ReadBits (0x0401); all reads run within one serialized job.
+func (q *PLCQueue) RandomRead(ctx context.Context, words, dwords, bits []mc.DeviceAddr) ([]uint16, []uint32, []bool, error) {
 	t := time.Now()
 	type result struct {
 		words  []uint16
 		dwords []uint32
+		bits   []bool
 	}
 	value, err := q.exec(ctx, func() (any, error) {
 		var r result
 		doErr := q.plc.do(func(c plcConnection) error {
 			plcStart := time.Now()
+			defer func() { writePLCLatency(ctx, time.Since(plcStart)) }()
 			var readErr error
-			r.words, r.dwords, readErr = c.RandomRead(words, dwords)
-			writePLCLatency(ctx, time.Since(plcStart))
-			return readErr
+			if len(words)+len(dwords) > 0 {
+				r.words, r.dwords, readErr = c.RandomRead(words, dwords)
+				if readErr != nil {
+					return readErr
+				}
+			}
+			r.bits = make([]bool, len(bits))
+			for i, b := range bits {
+				vals, err := c.ReadBits(b.Device, b.Addr, 1)
+				if err != nil {
+					return err
+				}
+				r.bits[i] = len(vals) > 0 && vals[0]
+			}
+			return nil
 		})
 		return r, doErr
 	})
 	logPLCOp("random_read", time.Since(t), err)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	r := value.(result)
-	return r.words, r.dwords, nil
+	return r.words, r.dwords, r.bits, nil
+}
+
+// WordBitWrite is a single bit-access write to a word device (e.g. D100.1),
+// resolved into a read-modify-write within RandomWrite.
+type WordBitWrite struct {
+	Device string
+	Addr   int
+	Bit    int
+	Value  bool
 }
 
 func (q *PLCQueue) RandomWrite(ctx context.Context,
 	words []mc.DeviceAddr, wordVals []uint16,
 	dwords []mc.DeviceAddr, dwordVals []uint32,
 	bits []mc.DeviceAddr, bitVals []bool,
+	wordBits []WordBitWrite,
 ) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {
@@ -434,12 +465,47 @@ func (q *PLCQueue) RandomWrite(ctx context.Context,
 					return err
 				}
 			}
-			return nil
+			return writeWordBits(c, wordBits)
 		})
 		return nil, doErr
 	})
 	logPLCOp("random_write", time.Since(t), err)
 	return err
+}
+
+// writeWordBits applies word-device bit writes via read-modify-write, grouping
+// bits in the same word into a single read/write so they don't clobber each other.
+func writeWordBits(c plcConnection, wordBits []WordBitWrite) error {
+	type key struct {
+		device string
+		addr   int
+	}
+	groups := map[key][]WordBitWrite{}
+	var order []key
+	for _, wb := range wordBits {
+		k := key{wb.Device, wb.Addr}
+		if _, ok := groups[k]; !ok {
+			order = append(order, k)
+		}
+		groups[k] = append(groups[k], wb)
+	}
+	for _, k := range order {
+		words, err := c.ReadWords(k.device, k.addr, 1)
+		if err != nil {
+			return err
+		}
+		for _, wb := range groups[k] {
+			if wb.Value {
+				words[0] |= 1 << uint(wb.Bit)
+			} else {
+				words[0] &^= 1 << uint(wb.Bit)
+			}
+		}
+		if err := c.WriteWords(k.device, k.addr, words); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (q *PLCQueue) Metrics() map[string]any {
