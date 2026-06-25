@@ -409,9 +409,11 @@ func (q *PLCQueue) RandomRead(ctx context.Context, words, dwords, bits []mc.Devi
 			plcStart := time.Now()
 			defer func() { writePLCLatency(ctx, time.Since(plcStart)) }()
 			var readErr error
-			r.words, r.dwords, readErr = c.RandomRead(words, dwords)
-			if readErr != nil {
-				return readErr
+			if len(words)+len(dwords) > 0 {
+				r.words, r.dwords, readErr = c.RandomRead(words, dwords)
+				if readErr != nil {
+					return readErr
+				}
 			}
 			r.bits = make([]bool, len(bits))
 			for i, b := range bits {

@@ -896,6 +896,11 @@ func handleRandomRead(plc *PLCQueue) http.HandlerFunc {
 		readAddrs := make([]mc.DeviceAddr, 0, len(wordAddrs)+len(bitWordAddrs))
 		readAddrs = append(readAddrs, wordAddrs...)
 		readAddrs = append(readAddrs, bitWordAddrs...)
+		if len(readAddrs) > maxRandomCount {
+			writeErr(w, http.StatusBadRequest, "bad_request",
+				fmt.Sprintf("words and word-device bits combined must be %d or less, got %d", maxRandomCount, len(readAddrs)))
+			return
+		}
 		wordVals, dwordVals, nativeVals, err := plc.RandomRead(r.Context(), readAddrs, dwordAddrs, nativeBits)
 		if err != nil {
 			writePLCErr(w, err)

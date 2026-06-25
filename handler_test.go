@@ -1915,6 +1915,44 @@ func TestHandleRandomReadWordBitAccess(t *testing.T) {
 			t.Errorf("status = %d, want 400 (body: %s)", rec.Code, rec.Body.String())
 		}
 	})
+
+	t.Run("native-bit-only request skips word read", func(t *testing.T) {
+		// P1: no words/dwords — c.RandomRead must not be called
+		req := httptest.NewRequest(http.MethodPost, "/random-read",
+			strings.NewReader(`{"bits":["M5"]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomRead(q)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			Bits []bool `json:"bits"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(resp.Bits) != 1 || !resp.Bits[0] {
+			t.Errorf("bits = %v, want [true]", resp.Bits)
+		}
+	})
+
+	t.Run("words plus word-device bits over 255 returns 400", func(t *testing.T) {
+		// P2: combined readAddrs > maxRandomCount must be 400, not 502
+		wordAddrs := make([]string, maxRandomCount)
+		for i := range wordAddrs {
+			wordAddrs[i] = `"D` + strconv.Itoa(i) + `"`
+		}
+		// 255 words + 1 word-device bit = 256 > 255
+		body := `{"words":[` + strings.Join(wordAddrs, ",") + `],"bits":["D100.1"]}`
+		req := httptest.NewRequest(http.MethodPost, "/random-read", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomRead(q)(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400 (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
 }
 
 func TestHandleRandomWrite(t *testing.T) {
