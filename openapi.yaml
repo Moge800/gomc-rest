@@ -527,10 +527,9 @@ paths:
     post:
       summary: Random read PLC device values
       description: |
-        Read multiple non-contiguous word device addresses in a single MC Protocol request (command 0x0403).
-        `words` returns 16-bit unsigned values; `dwords` returns 32-bit unsigned values.
-        Only word devices (D, W, R, ZR, TN, STN, CN, Z, SW, SD) are supported.
-        Maximum 255 addresses per category. At least one of `words` or `dwords` must be non-empty.
+        Read multiple non-contiguous device addresses. `words` and `dwords` use a single MC Protocol random read (command 0x0403) returning 16-bit and 32-bit unsigned values; only word devices (D, W, R, ZR, TN, STN, CN, Z, SW, SD) are supported there.
+        `bits` accepts word-device bit access (e.g. `D100.1`) and bit devices (e.g. `M0`). Word-device bits are read by folding the containing word into the random read and masking the bit. Bit devices have no MC random-read unit, so each is read with a separate ReadBits (0x0401) and is capped at 16 per request; use word-device bit access for more. All reads run within one serialized job.
+        Maximum 255 addresses per category. At least one of `words`, `dwords`, or `bits` must be non-empty.
       operationId: randomRead
       requestBody:
         required: true
@@ -551,9 +550,16 @@ paths:
                     type: string
                   description: "Word device addresses to read as 32-bit values (e.g. [\"D300\"])"
                   maxItems: 255
+                bits:
+                  type: array
+                  items:
+                    type: string
+                  description: "Word-device bit access (e.g. [\"D100.1\"]) or bit devices (e.g. [\"M0\"], max 16)"
+                  maxItems: 255
             example:
               words: ["D100", "D200"]
               dwords: ["D300"]
+              bits: ["D100.1", "M0"]
       responses:
         "200":
           description: OK
@@ -561,7 +567,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [words, dwords]
+                required: [words, dwords, bits]
                 properties:
                   words:
                     type: array
@@ -574,9 +580,15 @@ paths:
                       type: integer
                       format: int64
                     description: 32-bit unsigned values in the order of the request
+                  bits:
+                    type: array
+                    items:
+                      type: boolean
+                    description: Bit values in the order of the request
               example:
                 words: [1234, 5678]
                 dwords: [123456]
+                bits: [true, false]
         "400":
           $ref: "#/components/responses/BadRequest"
         "405":

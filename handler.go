@@ -858,29 +858,45 @@ func handleRandomRead(plc *PLCQueue) http.HandlerFunc {
 			}
 			dwordAddrs[i] = da
 		}
-		// Word-device bit access (e.g. D100.1): read the containing word and extract
-		// the bit. MC Protocol random read (0x0403) has no bit unit, so the underlying
-		// words are folded into the same RandomRead call and masked afterwards.
-		// Native bit devices (M0 etc.) are not supported here; use /read.
-		bitOffsets := make([]int, len(body.Bits))
-		bitWordAddrs := make([]mc.DeviceAddr, len(body.Bits))
+		// bits accepts two forms:
+		//   - word-device bit access (e.g. D100.1): the containing word is folded into
+		//     the RandomRead (0x0403) call and the bit is masked out afterwards.
+		//   - native bit devices (e.g. M0): MC random read has no bit unit, so each is
+		//     read with an individual ReadBits (0x0401), capped at maxRandomBitReads.
+		type bitSrc struct {
+			native bool
+			idx    int // index into nativeBits, or into bitWordAddrs
+			offset int // bit offset within the folded word (word-device bits only)
+		}
+		bitSrcs := make([]bitSrc, len(body.Bits))
+		var bitWordAddrs []mc.DeviceAddr
+		var nativeBits []mc.DeviceAddr
 		for i, s := range body.Bits {
 			pa, err := parseAddr(s)
 			if err != nil {
 				writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 				return
 			}
-			if pa.Bit < 0 {
-				writeErr(w, http.StatusBadRequest, "bad_request", "bits requires word-device bit access (e.g. D100.1); for bit devices use /read, got: "+s)
+			switch {
+			case pa.Bit >= 0:
+				bitSrcs[i] = bitSrc{idx: len(bitWordAddrs), offset: pa.Bit}
+				bitWordAddrs = append(bitWordAddrs, pa.DeviceAddr)
+			case !isWordDevice(pa.Device):
+				if len(nativeBits) >= maxRandomBitReads {
+					writeErr(w, http.StatusBadRequest, "bad_request", "at most "+strconv.Itoa(maxRandomBitReads)+" native bit devices per request (each costs a separate read); use word-device bit access (e.g. D100.1) for more")
+					return
+				}
+				bitSrcs[i] = bitSrc{native: true, idx: len(nativeBits)}
+				nativeBits = append(nativeBits, pa.DeviceAddr)
+			default:
+				writeErr(w, http.StatusBadRequest, "bad_request", "bits requires a bit device (e.g. M0) or word-device bit access (e.g. D100.1), got: "+s)
 				return
 			}
-			bitWordAddrs[i] = pa.DeviceAddr
-			bitOffsets[i] = pa.Bit
 		}
 		readAddrs := make([]mc.DeviceAddr, 0, len(wordAddrs)+len(bitWordAddrs))
 		readAddrs = append(readAddrs, wordAddrs...)
 		readAddrs = append(readAddrs, bitWordAddrs...)
-		wordVals, dwordVals, err := plc.RandomRead(r.Context(), readAddrs, dwordAddrs)
+		wordVals, dwordVals, nativeVals, err := plc.RandomRead(r.Context(), readAddrs, dwordAddrs, nativeBits)
 		if err != nil {
 			writePLCErr(w, err)
 			return
@@ -893,9 +909,13 @@ func handleRandomRead(plc *PLCQueue) http.HandlerFunc {
 		for i, v := range dwordVals {
 			dwordInts[i] = int64(v)
 		}
-		bitBools := make([]bool, len(bitOffsets))
-		for i, off := range bitOffsets {
-			bitBools[i] = (wordVals[len(wordAddrs)+i]>>uint(off))&1 == 1
+		bitBools := make([]bool, len(bitSrcs))
+		for i, src := range bitSrcs {
+			if src.native {
+				bitBools[i] = nativeVals[src.idx]
+			} else {
+				bitBools[i] = (wordVals[len(wordAddrs)+src.idx]>>uint(src.offset))&1 == 1
+			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"words": wordInts, "dwords": dwordInts, "bits": bitBools})
 	}

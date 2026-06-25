@@ -669,7 +669,13 @@ func (m *mockConn) WriteWords(device string, start int, values []uint16) error {
 	m.words[device+strconv.Itoa(start)] = values[0]
 	return nil
 }
-func (m *mockConn) ReadBits(_ string, _ int, _ int) ([]bool, error)  { return nil, nil }
+func (m *mockConn) ReadBits(device string, start, count int) ([]bool, error) {
+	out := make([]bool, count)
+	for i := 0; i < count; i++ {
+		out[i] = m.words[device+strconv.Itoa(start+i)] != 0
+	}
+	return out, nil
+}
 func (m *mockConn) WriteBits(_ string, _ int, _ []bool) error         { return nil }
 func (m *mockConn) RemoteRun(_ int, _ bool) error                     { return nil }
 func (m *mockConn) RemoteStop() error                                  { return nil }
@@ -1835,9 +1841,9 @@ func TestHandleRandomRead(t *testing.T) {
 
 func TestHandleRandomReadWordBitAccess(t *testing.T) {
 	// D100 = 0b0000_0000_0000_1010 → bit1=true, bit2=false, bit3=true
-	q := newMockPLCQueue(t, map[string]uint16{"D100": 0b1010, "D200": 5678})
+	q := newMockPLCQueue(t, map[string]uint16{"D100": 0b1010, "D200": 5678, "M5": 1})
 
-	t.Run("extracts bits and keeps words separate", func(t *testing.T) {
+	t.Run("extracts word-device bits and keeps words separate", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/random-read",
 			strings.NewReader(`{"words":["D200"],"bits":["D100.1","D100.2","D100.3"]}`))
 		req.Header.Set("Content-Type", "application/json")
@@ -1862,9 +1868,46 @@ func TestHandleRandomReadWordBitAccess(t *testing.T) {
 		}
 	})
 
-	t.Run("native bit device rejected", func(t *testing.T) {
+	t.Run("mixes native bit device and word-device bit in request order", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/random-read",
-			strings.NewReader(`{"bits":["M0"]}`))
+			strings.NewReader(`{"bits":["D100.1","M5","D100.2"]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomRead(q)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			Bits []bool `json:"bits"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		// D100.1=true, M5=true, D100.2=false — order preserved
+		want := []bool{true, true, false}
+		if len(resp.Bits) != 3 || resp.Bits[0] != want[0] || resp.Bits[1] != want[1] || resp.Bits[2] != want[2] {
+			t.Errorf("bits = %v, want %v", resp.Bits, want)
+		}
+	})
+
+	t.Run("word device without bit suffix rejected", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/random-read",
+			strings.NewReader(`{"bits":["D100"]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomRead(q)(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400 (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("too many native bit devices rejected", func(t *testing.T) {
+		addrs := make([]string, maxRandomBitReads+1)
+		for i := range addrs {
+			addrs[i] = `"M` + strconv.Itoa(i) + `"`
+		}
+		body := `{"bits":[` + strings.Join(addrs, ",") + `]}`
+		req := httptest.NewRequest(http.MethodPost, "/random-read", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		handleRandomRead(q)(rec, req)
