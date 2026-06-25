@@ -970,26 +970,29 @@ func handleRandomWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 			dwordAddrs[i] = pa.DeviceAddr
 			dwordVals[i] = e.Value
 		}
-		bitAddrs := make([]mc.DeviceAddr, len(body.Bits))
-		bitVals := make([]bool, len(body.Bits))
-		for i, e := range body.Bits {
+		var bitAddrs []mc.DeviceAddr
+		var bitVals []bool
+		var wordBits []WordBitWrite
+		for _, e := range body.Bits {
 			pa, err := parseAddr(e.Addr)
 			if err != nil {
 				writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 				return
 			}
+			// Word-device bit access (e.g. D100.1): handled via read-modify-write.
+			// parseAddr only permits a bit suffix on word devices, so Bit >= 0 implies one.
 			if pa.Bit >= 0 {
-				writeErr(w, http.StatusBadRequest, "bad_request", "bit suffix not allowed: "+e.Addr)
-				return
+				wordBits = append(wordBits, WordBitWrite{pa.Device, pa.Addr, pa.Bit, e.Value})
+				continue
 			}
 			if isWordDevice(pa.Device) {
 				writeErr(w, http.StatusBadRequest, "bad_request", "bits must be bit devices, got: "+e.Addr)
 				return
 			}
-			bitAddrs[i] = pa.DeviceAddr
-			bitVals[i] = e.Value
+			bitAddrs = append(bitAddrs, pa.DeviceAddr)
+			bitVals = append(bitVals, e.Value)
 		}
-		if err := plc.RandomWrite(r.Context(), wordAddrs, wordVals, dwordAddrs, dwordVals, bitAddrs, bitVals); err != nil {
+		if err := plc.RandomWrite(r.Context(), wordAddrs, wordVals, dwordAddrs, dwordVals, bitAddrs, bitVals, wordBits); err != nil {
 			writePLCErr(w, err)
 			return
 		}

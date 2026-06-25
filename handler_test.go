@@ -1913,6 +1913,74 @@ func TestHandleRandomWrite(t *testing.T) {
 	})
 }
 
+func TestHandleRandomWriteWordBitAccess(t *testing.T) {
+	t.Run("sets single bit via read-modify-write", func(t *testing.T) {
+		words := map[string]uint16{"D100": 0b0001}
+		q := newMockPLCQueue(t, words)
+		req := httptest.NewRequest(http.MethodPost, "/random-write",
+			strings.NewReader(`{"bits":[{"addr":"D100.2","value":true}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomWrite(q, false)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		// bit2 set, bit0 preserved → 0b0101
+		if got := words["D100"]; got != 0b0101 {
+			t.Errorf("D100 = %#b, want %#b", got, 0b0101)
+		}
+	})
+
+	t.Run("merges multiple bits in same word", func(t *testing.T) {
+		words := map[string]uint16{"D100": 0}
+		q := newMockPLCQueue(t, words)
+		req := httptest.NewRequest(http.MethodPost, "/random-write",
+			strings.NewReader(`{"bits":[{"addr":"D100.1","value":true},{"addr":"D100.3","value":true}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomWrite(q, false)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		// both bits set in one word, neither clobbers the other → 0b1010
+		if got := words["D100"]; got != 0b1010 {
+			t.Errorf("D100 = %#b, want %#b", got, 0b1010)
+		}
+	})
+
+	t.Run("clears bit", func(t *testing.T) {
+		words := map[string]uint16{"D100": 0b1111}
+		q := newMockPLCQueue(t, words)
+		req := httptest.NewRequest(http.MethodPost, "/random-write",
+			strings.NewReader(`{"bits":[{"addr":"D100.1","value":false}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomWrite(q, false)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		if got := words["D100"]; got != 0b1101 {
+			t.Errorf("D100 = %#b, want %#b", got, 0b1101)
+		}
+	})
+
+	t.Run("mixed word-bit and native bit device", func(t *testing.T) {
+		words := map[string]uint16{"D100": 0}
+		q := newMockPLCQueue(t, words)
+		req := httptest.NewRequest(http.MethodPost, "/random-write",
+			strings.NewReader(`{"bits":[{"addr":"D100.0","value":true},{"addr":"M0","value":true}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomWrite(q, false)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		if got := words["D100"]; got != 0b0001 {
+			t.Errorf("D100 = %#b, want %#b", got, 0b0001)
+		}
+	})
+}
+
 func waitForWorkQueueClosed(t *testing.T, queue *WorkQueue) {
 	t.Helper()
 	deadline := time.After(time.Second)

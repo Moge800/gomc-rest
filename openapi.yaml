@@ -597,9 +597,9 @@ paths:
       summary: Random write PLC device values
       description: |
         Write multiple non-contiguous device addresses in one or two MC Protocol requests.
-        `words` and `dwords` use command 0x1402 (word/dword random write); `bits` uses command 0x1402 subcommand 0x0001 (bit random write).
+        `words` and `dwords` use command 0x1402 (word/dword random write); bit devices in `bits` use command 0x1402 subcommand 0x0001 (bit random write).
         Both commands are issued within a single serialized job.
-        `words` and `dwords` require word devices; `bits` requires bit devices.
+        `words` and `dwords` require word devices. `bits` accepts bit devices (e.g. `M0`) and word-device bit access (e.g. `D100.1`); word-device bits are applied via read-modify-write, with bits in the same word merged into a single read/write.
         Maximum 255 entries per array. At least one array must be non-empty.
         Requires server not started with `-readonly`.
       operationId: randomWrite
@@ -647,7 +647,7 @@ paths:
                     properties:
                       addr:
                         type: string
-                        description: Bit device address
+                        description: Bit device address (e.g. `M0`) or word-device bit access (e.g. `D100.1`)
                       value:
                         type: boolean
                   maxItems: 255
