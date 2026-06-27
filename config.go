@@ -65,21 +65,28 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 	logFile := fs.String("log-file", getenvWith(lookupEnv, "GOMCR_LOG_FILE", ""), "path to log file (empty = console only)")
 	logLevelStr := fs.String("log-level", getenvWith(lookupEnv, "GOMCR_LOG_LEVEL", "info"), "terminal log level (debug|info|warn|error)")
 	logFileLevelStr := fs.String("log-file-level", getenvWith(lookupEnv, "GOMCR_LOG_FILE_LEVEL", "warn"), "file log level (debug|info|warn|error); only used with -log-file")
-	token := fs.String("token", getenvWith(lookupEnv, "GOMCR_TOKEN", ""), "static bearer token for request auth (empty = no auth); overrides GOMCR_TOKEN. Visible in the process list")
+	// Default is empty (not the env value) so that GOMCR_TOKEN never leaks into
+	// the -h help output. The env fallback is applied after parsing instead.
+	token := fs.String("token", "", "static bearer token for request auth (empty = no auth); overrides GOMCR_TOKEN. Visible in the process list")
 
 	if err := fs.Parse(args); err != nil {
 		return ServerConfig{}, err
 	}
 
-	var readonlySet, enableRemoteSet bool
+	var readonlySet, enableRemoteSet, tokenSet bool
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "readonly":
 			readonlySet = true
 		case "enable-remote":
 			enableRemoteSet = true
+		case "token":
+			tokenSet = true
 		}
 	})
+	if !tokenSet {
+		*token = lookupEnv("GOMCR_TOKEN")
+	}
 	if !readonlySet {
 		readonlyDefault, err := getenvBoolWith(lookupEnv, "GOMCR_READONLY", false)
 		if err != nil {
