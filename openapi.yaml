@@ -8,7 +8,21 @@ info:
 servers:
   - url: http://localhost:8080
 
+# Applies only when the server is started with GOMCR_TOKEN set. When it is
+# unset there is no authentication. /health overrides this with `security: []`.
+security:
+  - bearerAuth: []
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Static shared token supplied via the -token flag or the GOMCR_TOKEN
+        environment variable. Sent as `Authorization: Bearer <token>`.
+        The token travels in cleartext
+        over HTTP; terminate TLS with a reverse proxy if encryption is needed.
   schemas:
     ErrorResponse:
       type: object
@@ -235,6 +249,7 @@ paths:
       summary: PLC connection health
       description: Always returns HTTP 200 for GET requests. Check `connected` to determine PLC reachability.
       operationId: getHealth
+      security: []
       responses:
         "200":
           description: OK
