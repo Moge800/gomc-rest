@@ -42,6 +42,7 @@ type ServerConfig struct {
 	LogFile      string
 	LogLevel     slog.Level
 	LogFileLevel slog.Level
+	Token        string
 }
 
 func parseConfig(args []string, lookupEnv func(string) string, output io.Writer) (ServerConfig, error) {
@@ -145,6 +146,10 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		return ServerConfig{}, fmt.Errorf("invalid log-file-level %q: must be debug, info, warn, or error", *logFileLevelStr)
 	}
 
+	// Token is env-only on purpose: a secret passed as a CLI flag would be
+	// visible to other users via the process list (e.g. ps).
+	token := lookupEnv("GOMCR_TOKEN")
+
 	return ServerConfig{
 		Host:         *host,
 		Port:         port,
@@ -160,6 +165,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		LogFile:      *logFile,
 		LogLevel:     logLevel,
 		LogFileLevel: logFileLevel,
+		Token:        token,
 	}, nil
 }
 

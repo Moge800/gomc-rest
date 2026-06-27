@@ -40,3 +40,5 @@ resource_windows_amd64.syso
 .claude/*
 !.claude/CLAUDE.md
 copilot-instructions.md
+# private planning notes
+.docs/

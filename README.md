@@ -185,6 +185,29 @@ Flags take priority. Environment variables provide the default values for those 
 | `-log-file` | `GOMCR_LOG_FILE` | _(none)_ | Path to log file; if set, logs are written to both the file and stderr |
 | `-log-level` | `GOMCR_LOG_LEVEL` | `info` | Terminal log level: `debug`, `info`, `warn`, or `error` |
 | `-log-file-level` | `GOMCR_LOG_FILE_LEVEL` | `warn` | File log level: `debug`, `info`, `warn`, or `error`; only used with `-log-file` |
+| _(none)_ | `GOMCR_TOKEN` | _(none)_ | Static bearer token. If set, all endpoints except `/health` require `Authorization: Bearer <token>`. Env-only (kept out of the process list). |
+
+## Authentication
+
+By default there is no authentication, matching the closed-network use case.
+Set `GOMCR_TOKEN` to require a static bearer token on every request except the
+`/health` liveness probe:
+
+```sh
+# server (.env or environment)
+GOMCR_TOKEN=your-shared-secret
+```
+
+```sh
+# client
+curl -H "Authorization: Bearer your-shared-secret" "http://localhost:8080/read?addr=D100"
+```
+
+A request with a missing or wrong token gets `401 unauthorized`.
+
+> **Note:** the token travels in cleartext over HTTP. This is intentional for
+> air-gapped FA networks. If you need transport encryption, put a
+> TLS-terminating reverse proxy (nginx, Caddy, …) in front of gomc-rest.
 
 ## API Reference
 

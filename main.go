@@ -72,7 +72,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           logRequests(recoverPanic(mux)),
+		Handler:           logRequests(recoverPanic(requireToken(mux, cfg.Token))),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -92,6 +92,7 @@ func main() {
 			"mode", cfg.ModeString,
 			"readonly", cfg.ReadOnly,
 			"enable_remote", cfg.EnableRemote,
+			"auth", cfg.Token != "",
 			"log_level", cfg.LogLevel,
 			"queue_size", cfg.QueueSize,
 			"timeout", cfg.Timeout,

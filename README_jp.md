@@ -187,6 +187,29 @@ go build -o gomc-rest .
 | `-log-file` | `GOMCR_LOG_FILE` | _(なし)_ | ログファイルのパス。指定するとファイルと stderr の両方に出力 |
 | `-log-level` | `GOMCR_LOG_LEVEL` | `info` | ターミナルのログレベル: `debug`、`info`、`warn`、または `error` |
 | `-log-file-level` | `GOMCR_LOG_FILE_LEVEL` | `warn` | ファイルへのログレベル: `debug`、`info`、`warn`、または `error`。`-log-file` 指定時のみ有効 |
+| _(なし)_ | `GOMCR_TOKEN` | _(なし)_ | 静的ベアラートークン。設定すると `/health` を除く全エンドポイントで `Authorization: Bearer <token>` が必須になります。環境変数のみ（プロセス一覧に出さないため）。 |
+
+## 認証
+
+デフォルトでは認証はありません（閉域ネットワーク用途に合わせた挙動）。
+`GOMCR_TOKEN` を設定すると、`/health`（死活監視用）を除く全リクエストで
+静的ベアラートークンが必須になります。
+
+```sh
+# サーバ側（.env または環境変数）
+GOMCR_TOKEN=your-shared-secret
+```
+
+```sh
+# クライアント側
+curl -H "Authorization: Bearer your-shared-secret" "http://localhost:8080/read?addr=D100"
+```
+
+トークンが未指定または不一致のリクエストは `401 unauthorized` を返します。
+
+> **注意:** トークンは HTTP 上を平文で流れます。これは閉域 FA ネットワークを
+> 前提とした意図的な設計です。通信の暗号化が必要な場合は、gomc-rest の前段に
+> TLS 終端のリバースプロキシ（nginx、Caddy など）を置いてください。
 
 ## API リファレンス
 
