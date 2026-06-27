@@ -65,6 +65,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 	logFile := fs.String("log-file", getenvWith(lookupEnv, "GOMCR_LOG_FILE", ""), "path to log file (empty = console only)")
 	logLevelStr := fs.String("log-level", getenvWith(lookupEnv, "GOMCR_LOG_LEVEL", "info"), "terminal log level (debug|info|warn|error)")
 	logFileLevelStr := fs.String("log-file-level", getenvWith(lookupEnv, "GOMCR_LOG_FILE_LEVEL", "warn"), "file log level (debug|info|warn|error); only used with -log-file")
+	token := fs.String("token", getenvWith(lookupEnv, "GOMCR_TOKEN", ""), "static bearer token for request auth (empty = no auth); overrides GOMCR_TOKEN. Visible in the process list")
 
 	if err := fs.Parse(args); err != nil {
 		return ServerConfig{}, err
@@ -146,10 +147,6 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		return ServerConfig{}, fmt.Errorf("invalid log-file-level %q: must be debug, info, warn, or error", *logFileLevelStr)
 	}
 
-	// Token is env-only on purpose: a secret passed as a CLI flag would be
-	// visible to other users via the process list (e.g. ps).
-	token := lookupEnv("GOMCR_TOKEN")
-
 	return ServerConfig{
 		Host:         *host,
 		Port:         port,
@@ -165,7 +162,7 @@ func parseConfig(args []string, lookupEnv func(string) string, output io.Writer)
 		LogFile:      *logFile,
 		LogLevel:     logLevel,
 		LogFileLevel: logFileLevel,
-		Token:        token,
+		Token:        *token,
 	}, nil
 }
 

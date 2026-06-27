@@ -185,7 +185,7 @@ Flags take priority. Environment variables provide the default values for those 
 | `-log-file` | `GOMCR_LOG_FILE` | _(none)_ | Path to log file; if set, logs are written to both the file and stderr |
 | `-log-level` | `GOMCR_LOG_LEVEL` | `info` | Terminal log level: `debug`, `info`, `warn`, or `error` |
 | `-log-file-level` | `GOMCR_LOG_FILE_LEVEL` | `warn` | File log level: `debug`, `info`, `warn`, or `error`; only used with `-log-file` |
-| _(none)_ | `GOMCR_TOKEN` | _(none)_ | Static bearer token. If set, all endpoints except `/health` require `Authorization: Bearer <token>`. Env-only (kept out of the process list). |
+| `-token` | `GOMCR_TOKEN` | _(none)_ | Static bearer token. If set, all endpoints except `/health` require `Authorization: Bearer <token>`. The flag overrides the env var and is convenient for per-instance tokens, but is visible in the process list. |
 
 ## Authentication
 
@@ -193,19 +193,31 @@ By default there is no authentication, matching the closed-network use case.
 Set `GOMCR_TOKEN` to require a static bearer token on every request except the
 `/health` liveness probe:
 
-Pass it as an environment variable when launching the server (gomc-rest does
-not read a `.env` file):
+Pass it either as the `-token` flag or the `GOMCR_TOKEN` environment variable
+(the flag wins; gomc-rest does not read a `.env` file):
 
 ```bat
-REM Windows (batch): set it before starting gomc-rest.exe
+REM Windows (batch), environment variable
 set GOMCR_TOKEN=your-shared-secret
 gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT%
 ```
 
 ```sh
-# Linux / macOS
+# Linux / macOS, environment variable
 GOMCR_TOKEN=your-shared-secret ./gomc-rest -host 192.168.0.1 -port 5007
 ```
+
+When running **multiple instances** on one host, the `-token` flag gives each
+one its own token without worrying about a shared/inherited env var:
+
+```sh
+./gomc-rest -listen :8080 -token token-for-plc-a -host 192.168.0.1 -port 5007
+./gomc-rest -listen :8081 -token token-for-plc-b -host 192.168.0.2 -port 5007
+```
+
+> **Note:** values passed via `-token` are visible in the process list (`ps`,
+> Task Manager). On the closed networks gomc-rest targets this is usually
+> acceptable; use `GOMCR_TOKEN` instead if you want to keep it out of `ps`.
 
 ```sh
 # client

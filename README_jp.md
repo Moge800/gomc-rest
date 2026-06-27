@@ -187,7 +187,7 @@ go build -o gomc-rest .
 | `-log-file` | `GOMCR_LOG_FILE` | _(なし)_ | ログファイルのパス。指定するとファイルと stderr の両方に出力 |
 | `-log-level` | `GOMCR_LOG_LEVEL` | `info` | ターミナルのログレベル: `debug`、`info`、`warn`、または `error` |
 | `-log-file-level` | `GOMCR_LOG_FILE_LEVEL` | `warn` | ファイルへのログレベル: `debug`、`info`、`warn`、または `error`。`-log-file` 指定時のみ有効 |
-| _(なし)_ | `GOMCR_TOKEN` | _(なし)_ | 静的ベアラートークン。設定すると `/health` を除く全エンドポイントで `Authorization: Bearer <token>` が必須になります。環境変数のみ（プロセス一覧に出さないため）。 |
+| `-token` | `GOMCR_TOKEN` | _(なし)_ | 静的ベアラートークン。設定すると `/health` を除く全エンドポイントで `Authorization: Bearer <token>` が必須になります。フラグは環境変数より優先され、インスタンスごとのトークン指定に便利ですが、プロセス一覧に表示されます。 |
 
 ## 認証
 
@@ -195,18 +195,31 @@ go build -o gomc-rest .
 `GOMCR_TOKEN` を設定すると、`/health`（死活監視用）を除く全リクエストで
 静的ベアラートークンが必須になります。
 
-サーバ起動時に環境変数として渡します（gomc-rest は `.env` ファイルを読み込みません）:
+`-token` フラグまたは `GOMCR_TOKEN` 環境変数で渡します（フラグが優先。gomc-rest
+は `.env` ファイルを読み込みません）:
 
 ```bat
-REM Windows（バッチ）: gomc-rest.exe を起動する前に設定
+REM Windows（バッチ）: 環境変数
 set GOMCR_TOKEN=your-shared-secret
 gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT%
 ```
 
 ```sh
-# Linux / macOS
+# Linux / macOS: 環境変数
 GOMCR_TOKEN=your-shared-secret ./gomc-rest -host 192.168.0.1 -port 5007
 ```
+
+1台のホストで**複数インスタンス**を動かす場合、`-token` フラグを使えば共有・継承
+される環境変数を気にせずインスタンスごとに別トークンを指定できます:
+
+```sh
+./gomc-rest -listen :8080 -token token-for-plc-a -host 192.168.0.1 -port 5007
+./gomc-rest -listen :8081 -token token-for-plc-b -host 192.168.0.2 -port 5007
+```
+
+> **注意:** `-token` で渡した値はプロセス一覧（`ps`、タスクマネージャー）に表示
+> されます。gomc-rest が対象とする閉域ネットワークでは通常許容範囲ですが、`ps` に
+> 出したくない場合は `GOMCR_TOKEN` を使ってください。
 
 ```sh
 # クライアント側
