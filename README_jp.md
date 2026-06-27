@@ -195,9 +195,17 @@ go build -o gomc-rest .
 `GOMCR_TOKEN` を設定すると、`/health`（死活監視用）を除く全リクエストで
 静的ベアラートークンが必須になります。
 
+サーバ起動時に環境変数として渡します（gomc-rest は `.env` ファイルを読み込みません）:
+
+```bat
+REM Windows（バッチ）: gomc-rest.exe を起動する前に設定
+set GOMCR_TOKEN=your-shared-secret
+gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT%
+```
+
 ```sh
-# サーバ側（.env または環境変数）
-GOMCR_TOKEN=your-shared-secret
+# Linux / macOS
+GOMCR_TOKEN=your-shared-secret ./gomc-rest -host 192.168.0.1 -port 5007
 ```
 
 ```sh

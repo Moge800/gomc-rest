@@ -193,9 +193,18 @@ By default there is no authentication, matching the closed-network use case.
 Set `GOMCR_TOKEN` to require a static bearer token on every request except the
 `/health` liveness probe:
 
+Pass it as an environment variable when launching the server (gomc-rest does
+not read a `.env` file):
+
+```bat
+REM Windows (batch): set it before starting gomc-rest.exe
+set GOMCR_TOKEN=your-shared-secret
+gomc-rest.exe -host %PLC_HOST% -port %PLC_PORT%
+```
+
 ```sh
-# server (.env or environment)
-GOMCR_TOKEN=your-shared-secret
+# Linux / macOS
+GOMCR_TOKEN=your-shared-secret ./gomc-rest -host 192.168.0.1 -port 5007
 ```
 
 ```sh
