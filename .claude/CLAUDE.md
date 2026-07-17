@@ -84,7 +84,30 @@ The test: someone reading `.docs/decisions.md` later can understand *why* the co
 - After changing Go bound methods, run `wails generate module`. Verify with `wails build`.
 - Target is a single Windows `.exe` for closed/air-gapped networks.
 
-## 7. Git Workflow
+## 7. Model Delegation
+
+**Claude is the coordinator and final reviewer. Delegate suitable bounded tasks proactively without asking for permission each time.**
+
+Use **Codex** for:
+- Repository-wide investigation and implementation.
+- Multi-file edits and substantial refactoring.
+- Running tests, builds, and iterative fixes.
+- Independent review that requires full repository context.
+
+Use **Houtini LM with Ollama/Qwen** for:
+- Bounded code generation and simple refactoring proposals.
+- Unit-test drafts, boilerplate, type definitions, and documentation drafts.
+- Code explanations and low-risk second-opinion reviews.
+- Tasks that can be completed from explicitly provided files and instructions.
+
+Claude must:
+- Choose the appropriate delegate and provide sufficient context.
+- Review and verify delegated output before applying it.
+- Keep architecture, security-sensitive decisions, final edits, and final verification under Claude's control.
+- Prefer Houtini for suitable local tasks and Codex when autonomous repository access, file edits, or command execution are required.
+- Never send secrets or credentials to any model. Do not send private operational data to external services such as Codex.
+
+## 8. Git Workflow
 
 **Do not push directly to `main`** (except when the user explicitly instructs it for a
 specific change — see below). Always work on a branch and merge via Pull Request.
@@ -108,13 +131,22 @@ specific change — see below). Always work on a branch and merge via Pull Reque
 
 
 ---
-**Stream Timeout Prevention**
- - Do each task ONE AT A TIME. Complete one, confirm, then move to the next.
- - Never write a file longer than ~150 lines in a single tool call.
- - If a file will be longer, write it in multiple append/edit passes.
- - Start a fresh session if the conversation gets long (20+ tool calls).
- - The error gets worse as the session grows.
- - Keep individual grep/search outputs short. Use flags like
- - --include and -l (list files only) to limit output size.
- - If you do hit the timeout, retry the same step in a shorter form.
- - Don't repeat the entire task from scratch.
+
+## 9. Reliability and Context Management
+
+**Keep tool output focused and recover from failures without restarting completed work.**
+
+- Limit searches, logs, and file reads to the smallest useful scope.
+  Prefer targeted patterns, paths, offsets, and result limits.
+- Do not split normal file edits merely because a file is long.
+  Use the editing method least likely to leave a partial or invalid file.
+- For large investigations, use subagents or delegated tools when only
+  their conclusions are needed in the main context.
+- Check context usage with `/context` when a session becomes large.
+  Use `/compact` to preserve relevant progress, or `/clear` when switching
+  to an unrelated task.
+- If a tool call or stream times out, inspect what completed, then retry
+  only the failed portion with narrower input or output.
+- Never repeat completed work from scratch unless its result is invalid.
+- After recovering from an interrupted edit, verify the affected file
+  and run the relevant build or tests.
