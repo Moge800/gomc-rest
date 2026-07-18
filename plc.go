@@ -189,6 +189,7 @@ func (p *PLCClient) doReset(ctx context.Context) error {
 	elapsed := time.Since(plcStart)
 	p.metrics.recordLatency(elapsed.Nanoseconds())
 	writePLCLatency(ctx, elapsed)
+	_ = p.conn.Close()
 	p.conn = nil // PLC closes connection on reset regardless of error
 
 	var connErr *mc.MCProtocolConnectionError
