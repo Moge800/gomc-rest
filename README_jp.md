@@ -51,6 +51,8 @@ PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使�
 | Windows (amd64) | `gomc-rest.exe` |
 | Linux (amd64) | `gomc-rest-linux-amd64` |
 | Linux (arm64 / Raspberry Pi 5) | `gomc-rest-linux-arm64` |
+| macOS (Intel) | `gomc-rest-darwin-amd64` |
+| macOS (Apple Silicon) | `gomc-rest-darwin-arm64` |
 
 ## クイックスタート（Windows）
 
