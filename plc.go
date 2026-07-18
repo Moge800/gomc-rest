@@ -150,6 +150,7 @@ func (p *PLCClient) do(fn func(plcConnection) error) error {
 	p.metrics.plcErrors.Add(1)
 	var connErr *mc.MCProtocolConnectionError
 	if errors.As(err, &connErr) {
+		_ = p.conn.Close()
 		p.conn = nil
 		slog.Warn("PLC connection lost", "host", p.host, "port", p.port, "error", err)
 		return &connErrWrap{err}
