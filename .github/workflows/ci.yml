@@ -31,3 +31,9 @@ jobs:
 
       - name: Build (Windows amd64)
         run: GOOS=windows GOARCH=amd64 go build -o gomc-rest.exe .
+
+      - name: Build (macOS amd64)
+        run: GOOS=darwin GOARCH=amd64 go build -o gomc-rest-darwin-amd64 .
+
+      - name: Build (macOS arm64)
+        run: GOOS=darwin GOARCH=arm64 go build -o gomc-rest-darwin-arm64 .

@@ -4,9 +4,9 @@
 
 [![Release](https://img.shields.io/github/v/release/moge800/gomc-rest)](https://github.com/moge800/gomc-rest/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/moge800/gomc-rest/ci.yml?branch=main&label=CI)](https://github.com/moge800/gomc-rest/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](#ダウンロード)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)](#ダウンロード)
 
 `gomc-rest` は、三菱電機 PLC（MC プロトコル 3E / 4E フレーム）向けの小さな REST API サーバー属 HTTP ゲートウェイです。HTTP クライアントと PLC の間に入り、`D100.0`、`W100`、`M0` のようなデバイス文字列を指定した読み書きを仓介しつつ、ワードデバイスは整数、ビットデバイスは真偽値として JSON に自動変換します。
 
@@ -51,6 +51,8 @@ PLC 通信には [gomcprotocol](https://github.com/moge800/gomcprotocol) を使�
 | Windows (amd64) | `gomc-rest.exe` |
 | Linux (amd64) | `gomc-rest-linux-amd64` |
 | Linux (arm64 / Raspberry Pi 5) | `gomc-rest-linux-arm64` |
+| macOS (Intel) | `gomc-rest-darwin-amd64` |
+| macOS (Apple Silicon) | `gomc-rest-darwin-arm64` |
 
 ## クイックスタート（Windows）
 

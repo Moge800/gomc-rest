@@ -150,6 +150,7 @@ func (p *PLCClient) do(fn func(plcConnection) error) error {
 	p.metrics.plcErrors.Add(1)
 	var connErr *mc.MCProtocolConnectionError
 	if errors.As(err, &connErr) {
+		_ = p.conn.Close()
 		p.conn = nil
 		slog.Warn("PLC connection lost", "host", p.host, "port", p.port, "error", err)
 		return &connErrWrap{err}
@@ -188,6 +189,7 @@ func (p *PLCClient) doReset(ctx context.Context) error {
 	elapsed := time.Since(plcStart)
 	p.metrics.recordLatency(elapsed.Nanoseconds())
 	writePLCLatency(ctx, elapsed)
+	_ = p.conn.Close()
 	p.conn = nil // PLC closes connection on reset regardless of error
 
 	var connErr *mc.MCProtocolConnectionError
