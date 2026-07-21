@@ -121,11 +121,15 @@ func isStateEvent(r slog.Record) bool {
 }
 
 func logState(msg string, args ...any) {
-	logStateWith(slog.Default(), msg, args...)
+	logStateAt(slog.Default(), slog.LevelInfo, msg, args...)
 }
 
-func logStateWith(logger *slog.Logger, msg string, args ...any) {
-	logger.Info(msg, append([]any{"kind", stateLogKind}, args...)...)
+func logStateWarn(msg string, args ...any) {
+	logStateAt(slog.Default(), slog.LevelWarn, msg, args...)
+}
+
+func logStateAt(logger *slog.Logger, level slog.Level, msg string, args ...any) {
+	logger.Log(context.Background(), level, msg, append([]any{"kind", stateLogKind}, args...)...)
 }
 
 // logPLCOp logs a single PLC operation result via slog.

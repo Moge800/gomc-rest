@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -105,7 +104,7 @@ func (p *PLCClient) initialConnect() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if err := p.connect(); err != nil {
-		slog.Warn("PLC initial connect failed, will retry on first request", "error", err)
+		logStateWarn("PLC initial connect failed, will retry on first request", "error", err)
 		return
 	}
 	logState("PLC connected", "host", p.host, "port", p.port)
@@ -129,10 +128,10 @@ func (p *PLCClient) do(fn func(plcConnection) error) error {
 	defer p.mu.Unlock()
 
 	if p.conn == nil {
-		slog.Warn("PLC reconnecting", "host", p.host, "port", p.port)
+		logStateWarn("PLC reconnecting", "host", p.host, "port", p.port)
 		if err := p.reconnect(); err != nil {
 			p.metrics.plcErrors.Add(1)
-			slog.Warn("PLC reconnect failed", "error", err)
+			logStateWarn("PLC reconnect failed", "error", err)
 			return &connErrWrap{err}
 		}
 		logState("PLC reconnected", "host", p.host, "port", p.port)
@@ -152,7 +151,7 @@ func (p *PLCClient) do(fn func(plcConnection) error) error {
 	if errors.As(err, &connErr) {
 		_ = p.conn.Close()
 		p.conn = nil
-		slog.Warn("PLC connection lost", "host", p.host, "port", p.port, "error", err)
+		logStateWarn("PLC connection lost", "host", p.host, "port", p.port, "error", err)
 		return &connErrWrap{err}
 	}
 	return err
@@ -174,10 +173,10 @@ func (p *PLCClient) doReset(ctx context.Context) error {
 	defer p.mu.Unlock()
 
 	if p.conn == nil {
-		slog.Warn("PLC reconnecting", "host", p.host, "port", p.port)
+		logStateWarn("PLC reconnecting", "host", p.host, "port", p.port)
 		if err := p.reconnect(); err != nil {
 			p.metrics.plcErrors.Add(1)
-			slog.Warn("PLC reconnect failed", "error", err)
+			logStateWarn("PLC reconnect failed", "error", err)
 			return &connErrWrap{err}
 		}
 		logState("PLC reconnected", "host", p.host, "port", p.port)

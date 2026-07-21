@@ -190,7 +190,7 @@ func TestStateEventHandlerWritesOnlyStateInfoBelowThreshold(t *testing.T) {
 		t.Fatalf("ordinary Info log was written below Warn threshold: %s", buf.String())
 	}
 
-	logStateWith(logger, "PLC reconnected", "host", "192.168.0.10")
+	logStateAt(logger, slog.LevelInfo, "PLC reconnected", "host", "192.168.0.10")
 	got := buf.String()
 	if !strings.Contains(got, "msg=\"PLC reconnected\"") {
 		t.Errorf("state event missing from file log: %s", got)
@@ -203,6 +203,29 @@ func TestStateEventHandlerWritesOnlyStateInfoBelowThreshold(t *testing.T) {
 	logger.Warn("PLC reconnect failed")
 	if !strings.Contains(buf.String(), "msg=\"PLC reconnect failed\"") {
 		t.Errorf("Warn log was filtered out: %s", buf.String())
+	}
+}
+
+func TestStateEventHandlerWithErrorThreshold(t *testing.T) {
+	var buf bytes.Buffer
+	base := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError})
+	logger := slog.New(newStateEventHandler(base))
+
+	logger.Info("ordinary Info")
+	logger.Warn("ordinary Warn")
+	logStateAt(logger, slog.LevelInfo, "PLC reconnected")
+	logStateAt(logger, slog.LevelWarn, "PLC connection lost")
+
+	got := buf.String()
+	for _, want := range []string{"PLC reconnected", "PLC connection lost"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("state event %q missing from Error-threshold log: %s", want, got)
+		}
+	}
+	for _, unwanted := range []string{"ordinary Info", "ordinary Warn"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("non-state event %q bypassed Error threshold: %s", unwanted, got)
+		}
 	}
 }
 
