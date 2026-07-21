@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -175,6 +177,32 @@ func TestLogRequestsDurationMs(t *testing.T) {
 	}
 	if !foundDurationMs {
 		t.Error("duration_ms not found in log attrs")
+	}
+}
+
+func TestStateEventHandlerWritesOnlyStateInfoBelowThreshold(t *testing.T) {
+	var buf bytes.Buffer
+	base := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})
+	logger := slog.New(newStateEventHandler(base)).With("run_id", "test-run")
+
+	logger.Info("request", "status", http.StatusOK)
+	if buf.Len() != 0 {
+		t.Fatalf("ordinary Info log was written below Warn threshold: %s", buf.String())
+	}
+
+	logStateWith(logger, "PLC reconnected", "host", "192.168.0.10")
+	got := buf.String()
+	if !strings.Contains(got, "msg=\"PLC reconnected\"") {
+		t.Errorf("state event missing from file log: %s", got)
+	}
+	if !strings.Contains(got, "kind=state") || !strings.Contains(got, "run_id=test-run") {
+		t.Errorf("state event identifiers missing: %s", got)
+	}
+
+	buf.Reset()
+	logger.Warn("PLC reconnect failed")
+	if !strings.Contains(buf.String(), "msg=\"PLC reconnect failed\"") {
+		t.Errorf("Warn log was filtered out: %s", buf.String())
 	}
 }
 

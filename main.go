@@ -44,11 +44,12 @@ func main() {
 		}
 		defer f.Close()
 		logOut = io.MultiWriter(os.Stderr, f)
-		fileHandler := slog.NewTextHandler(f, &slog.HandlerOptions{Level: cfg.LogFileLevel})
+		fileHandler := newStateEventHandler(slog.NewTextHandler(f, &slog.HandlerOptions{Level: cfg.LogFileLevel}))
 		handler = &teeHandler{handlers: []slog.Handler{charmLogger, fileHandler}}
 	}
 	log.SetOutput(logOut)
-	slog.SetDefault(slog.New(handler))
+	runID := fmt.Sprintf("%d-%d", os.Getpid(), time.Now().UnixNano())
+	slog.SetDefault(slog.New(handler).With("run_id", runID))
 
 	plc := newConfiguredPLCClient(cfg)
 	plcQueue := newPLCQueue(plc, cfg.QueueSize)
@@ -83,8 +84,9 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		slog.Info("listening",
+		logState("service_started",
 			"version", version,
+			"pid", os.Getpid(),
 			"addr", cfg.Listen,
 			"plc", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 			"frame", cfg.Frame,
@@ -104,7 +106,7 @@ func main() {
 	}()
 
 	<-quit
-	slog.Info("shutting down")
+	logState("service_stopping")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -115,4 +117,5 @@ func main() {
 		slog.Error("queue shutdown error", "error", err)
 	}
 	plcQueue.Close()
+	logState("service_stopped")
 }

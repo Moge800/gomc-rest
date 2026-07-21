@@ -79,6 +79,55 @@ func (t *teeHandler) WithGroup(name string) slog.Handler {
 	return &teeHandler{handlers: hs}
 }
 
+const stateLogKind = "state"
+
+// stateEventHandler writes state-transition Info records even when the wrapped
+// file handler is configured for Warn or Error. Other records still follow the
+// configured threshold, preventing successful request logs from flooding disk.
+type stateEventHandler struct {
+	handler slog.Handler
+}
+
+func newStateEventHandler(handler slog.Handler) slog.Handler {
+	return &stateEventHandler{handler: handler}
+}
+
+func (h *stateEventHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return level >= slog.LevelInfo || h.handler.Enabled(ctx, level)
+}
+
+func (h *stateEventHandler) Handle(ctx context.Context, r slog.Record) error {
+	if h.handler.Enabled(ctx, r.Level) || isStateEvent(r) {
+		return h.handler.Handle(ctx, r)
+	}
+	return nil
+}
+
+func (h *stateEventHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &stateEventHandler{handler: h.handler.WithAttrs(attrs)}
+}
+
+func (h *stateEventHandler) WithGroup(name string) slog.Handler {
+	return &stateEventHandler{handler: h.handler.WithGroup(name)}
+}
+
+func isStateEvent(r slog.Record) bool {
+	found := false
+	r.Attrs(func(a slog.Attr) bool {
+		found = a.Key == "kind" && a.Value.Kind() == slog.KindString && a.Value.String() == stateLogKind
+		return !found
+	})
+	return found
+}
+
+func logState(msg string, args ...any) {
+	logStateWith(slog.Default(), msg, args...)
+}
+
+func logStateWith(logger *slog.Logger, msg string, args ...any) {
+	logger.Info(msg, append([]any{"kind", stateLogKind}, args...)...)
+}
+
 // logPLCOp logs a single PLC operation result via slog.
 func logPLCOp(addr string, d time.Duration, err error) {
 	result := "ok"

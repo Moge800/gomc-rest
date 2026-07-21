@@ -108,7 +108,7 @@ func (p *PLCClient) initialConnect() {
 		slog.Warn("PLC initial connect failed, will retry on first request", "error", err)
 		return
 	}
-	slog.Info("PLC connected", "host", p.host, "port", p.port)
+	logState("PLC connected", "host", p.host, "port", p.port)
 }
 
 // isConnected reports current connection state. Caller must hold mu.
@@ -135,7 +135,7 @@ func (p *PLCClient) do(fn func(plcConnection) error) error {
 			slog.Warn("PLC reconnect failed", "error", err)
 			return &connErrWrap{err}
 		}
-		slog.Info("PLC reconnected", "host", p.host, "port", p.port)
+		logState("PLC reconnected", "host", p.host, "port", p.port)
 	}
 
 	p.metrics.requests.Add(1)
@@ -180,7 +180,7 @@ func (p *PLCClient) doReset(ctx context.Context) error {
 			slog.Warn("PLC reconnect failed", "error", err)
 			return &connErrWrap{err}
 		}
-		slog.Info("PLC reconnected", "host", p.host, "port", p.port)
+		logState("PLC reconnected", "host", p.host, "port", p.port)
 	}
 
 	p.metrics.requests.Add(1)
