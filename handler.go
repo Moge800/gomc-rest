@@ -48,6 +48,25 @@ func capLogQuery(s string) string {
 	return s[:maxLogQuery]
 }
 
+// signExtend reinterprets the low width bits of v as a two's-complement signed
+// value, so that e.g. K4 (16 bits) 0xFFFF reads back as -1.
+func signExtend(v uint32, width int) int64 {
+	if v&(uint32(1)<<uint(width-1)) != 0 {
+		return int64(v) - int64(1)<<uint(width)
+	}
+	return int64(v)
+}
+
+// fitsInBits reports whether v is representable in width bits, either unsigned
+// or as a two's-complement signed value.
+func fitsInBits(v int64, width int, signed bool) bool {
+	if signed {
+		lim := int64(1) << uint(width-1)
+		return v >= -lim && v <= lim-1
+	}
+	return v >= 0 && v < int64(1)<<uint(width)
+}
+
 // buildLogQuery builds "k0=v,v&k1=v,v" from keys/vals, capped at maxLogQuery bytes.
 // Writes are bounded to maxLogQuery so the full body is never concatenated into one string.
 func buildLogQuery(keys []string, vals [][]string) string {
@@ -390,6 +409,29 @@ func handleRead(plc *PLCQueue) http.HandlerFunc {
 			return
 		}
 
+		// K notation (e.g. K4M100): pack consecutive bit devices into one integer.
+		if da.Nibbles > 0 {
+			if dword {
+				writeErr(w, http.StatusBadRequest, "bad_request", "dword is not supported with K notation; use K5-K8 for 32-bit values")
+				return
+			}
+			if count != 1 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "count is not supported with K notation")
+				return
+			}
+			packed, err := plc.ReadBitsAsWord(r.Context(), da.Device, da.Addr, da.Nibbles)
+			if err != nil {
+				writePLCErr(w, err)
+				return
+			}
+			v := int64(packed)
+			if sint {
+				v = signExtend(packed, da.Nibbles*4)
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"values": []int64{v}})
+			return
+		}
+
 		if da.Bit >= 0 {
 			if dword || sint {
 				writeErr(w, http.StatusBadRequest, "bad_request", "dword and sint flags are not supported with bit access")
@@ -498,6 +540,53 @@ func handleWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 		sint, err := parseBoolParam(q, "sint")
 		if err != nil {
 			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+
+		// K notation (e.g. K4M100): unpack one integer across consecutive bit devices.
+		if da.Nibbles > 0 {
+			if dword {
+				writeErr(w, http.StatusBadRequest, "bad_request", "dword is not supported with K notation; use K5-K8 for 32-bit values")
+				return
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, maxWriteBody)
+			var body struct {
+				Values json.RawMessage `json:"values"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				var maxBytesErr *http.MaxBytesError
+				if errors.As(err, &maxBytesErr) {
+					writeErr(w, http.StatusRequestEntityTooLarge, "bad_request", "body must not be larger than "+strconv.FormatInt(maxBytesErr.Limit, 10)+" bytes")
+					return
+				}
+				writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+				return
+			}
+			if len(body.Values) == 0 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "values is required")
+				return
+			}
+			var vals []int64
+			if err := json.Unmarshal(body.Values, &vals); err != nil || len(vals) == 0 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "values must be an array of integers for K notation")
+				return
+			}
+			if len(vals) != 1 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "K notation accepts exactly one value")
+				return
+			}
+			width := da.Nibbles * 4
+			if !fitsInBits(vals[0], width, sint) {
+				writeErr(w, http.StatusBadRequest, "bad_request", fmt.Sprintf("value %d does not fit in %d bits", vals[0], width))
+				return
+			}
+			// Negative values convert to their two's-complement bit pattern;
+			// WriteBitsAsWord only consumes the low width bits.
+			if err := plc.WriteBitsAsWord(r.Context(), da.Device, da.Addr, da.Nibbles, uint32(vals[0])); err != nil {
+				writePLCErr(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 			return
 		}
 
@@ -877,6 +966,10 @@ func handleRandomRead(plc *PLCQueue) http.HandlerFunc {
 				writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 				return
 			}
+			if pa.Nibbles > 0 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "K notation is only supported on /read and /write, not here: "+s)
+				return
+			}
 			switch {
 			case pa.Bit >= 0:
 				bitSrcs[i] = bitSrc{idx: len(bitWordAddrs), offset: pa.Bit}
@@ -1029,6 +1122,10 @@ func handleRandomWrite(plc *PLCQueue, readonly bool) http.HandlerFunc {
 			pa, err := parseAddr(e.Addr)
 			if err != nil {
 				writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+				return
+			}
+			if pa.Nibbles > 0 {
+				writeErr(w, http.StatusBadRequest, "bad_request", "K notation is only supported on /read and /write, not here: "+e.Addr)
 				return
 			}
 			// Word-device bit access (e.g. D100.1): handled via read-modify-write.

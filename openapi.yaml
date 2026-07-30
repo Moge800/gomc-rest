@@ -367,7 +367,7 @@ paths:
         - name: addr
           in: query
           required: true
-          description: "PLC device address, e.g. `D100`, `M0`, `X1F`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (single hex digit 0–F), e.g. `D100.0`; with `count` it reads consecutive bits starting at `N` and returns `{\"values\":[true,false,...]}`. Bits must stay within one word (`N + count` ≤ 16)."
+          description: "PLC device address, e.g. `D100`, `M0`, `X1F`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (single hex digit 0–F), e.g. `D100.0`; with `count` it reads consecutive bits starting at `N` and returns `{\"values\":[true,false,...]}`. Bits must stay within one word (`N + count` ≤ 16). Bit devices support K notation with a `K<n>` prefix (`n` = 1–8), e.g. `K4M100` packs M100–M115 into one 16-bit integer (bits LSB-first). K notation returns a single-element array, rejects `count` and `dword`, and honours `sint` at the K width."
           schema:
             type: string
             example: "D100"
@@ -462,7 +462,7 @@ paths:
         - name: addr
           in: query
           required: true
-          description: "PLC device address, e.g. `D100`, `M0`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (single hex digit 0–F), e.g. `D100.0`; body is an array of booleans applied to consecutive bits starting at `N`, e.g. `{\"values\":[true,false,true]}`. Bits must stay within one word (`N + len(values)` ≤ 16)."
+          description: "PLC device address, e.g. `D100`, `M0`. Hex-addressed devices (X, Y, B, SB, W, SW, ZR, DX, DY) use hex numbers (e.g. `X4F`, `W1D`). Word devices support bit access with `.N` suffix (single hex digit 0–F), e.g. `D100.0`; body is an array of booleans applied to consecutive bits starting at `N`, e.g. `{\"values\":[true,false,true]}`. Bits must stay within one word (`N + len(values)` ≤ 16). Bit devices support K notation with a `K<n>` prefix (`n` = 1–8), e.g. `K4M100` unpacks one integer across M100–M115 (bits LSB-first). K notation takes exactly one integer value, rejects `dword`, and honours `sint` at the K width; out-of-range values return 400."
           schema:
             type: string
             example: "D100"

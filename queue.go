@@ -318,6 +318,60 @@ func (q *PLCQueue) WriteWordBits(ctx context.Context, device string, addr, bit i
 	return err
 }
 
+// ReadBitsAsWord reads nibbles*4 consecutive bit devices starting at addr and
+// packs them LSB-first into one integer: bit i of the result is device addr+i.
+// This is the K notation of Mitsubishi ladder logic (e.g. K4M100).
+func (q *PLCQueue) ReadBitsAsWord(ctx context.Context, device string, addr, nibbles int) (uint32, error) {
+	t := time.Now()
+	width := nibbles * 4
+	value, err := q.exec(ctx, func() (any, error) {
+		var packed uint32
+		doErr := q.plc.do(func(c plcConnection) error {
+			plcStart := time.Now()
+			bits, readErr := c.ReadBits(device, addr, width)
+			writePLCLatency(ctx, time.Since(plcStart))
+			if readErr != nil {
+				return readErr
+			}
+			packed = 0
+			for i, b := range bits {
+				if b {
+					packed |= 1 << uint(i)
+				}
+			}
+			return nil
+		})
+		return packed, doErr
+	})
+	logPLCOp("K"+strconv.Itoa(nibbles)+device+strconv.Itoa(addr), time.Since(t), err)
+	if err != nil {
+		return 0, err
+	}
+	return value.(uint32), nil
+}
+
+// WriteBitsAsWord unpacks value into nibbles*4 bits (LSB-first) and writes them
+// to consecutive bit devices starting at addr. See ReadBitsAsWord.
+func (q *PLCQueue) WriteBitsAsWord(ctx context.Context, device string, addr, nibbles int, value uint32) error {
+	t := time.Now()
+	width := nibbles * 4
+	_, err := q.exec(ctx, func() (any, error) {
+		doErr := q.plc.do(func(c plcConnection) error {
+			bits := make([]bool, width)
+			for i := range bits {
+				bits[i] = (value>>uint(i))&1 == 1
+			}
+			plcStart := time.Now()
+			writeErr := c.WriteBits(device, addr, bits)
+			writePLCLatency(ctx, time.Since(plcStart))
+			return writeErr
+		})
+		return nil, doErr
+	})
+	logPLCOp("K"+strconv.Itoa(nibbles)+device+strconv.Itoa(addr), time.Since(t), err)
+	return err
+}
+
 func (q *PLCQueue) RemoteRun(ctx context.Context, clear int, force bool) error {
 	t := time.Now()
 	_, err := q.exec(ctx, func() (any, error) {

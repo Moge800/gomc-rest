@@ -304,6 +304,30 @@ W1D.7     ← bit 7 of W1D (hex address 0x1D)
 - `dword=true` or `sint=true` combined with bit access returns `400 bad_request`.
 - Appending `.N` to a bit device (e.g. `M0.0`) returns `400 bad_request`.
 
+### K Notation (Bit Devices as an Integer)
+
+Prefix a bit device address with `K<n>` (`n` = `1`–`8`) to treat `n * 4` consecutive
+bit devices as a single integer, matching the `K` notation used in Mitsubishi ladder
+logic. Bits are packed least-significant first, so bit `i` of the value is the device
+at `addr + i`.
+
+```
+K1M100   ← M100–M103  as a  4-bit value (0–15)
+K2M100   ← M100–M107  as an 8-bit value (0–255)
+K4M100   ← M100–M115  as a 16-bit value (0–65535)
+K8M100   ← M100–M131  as a 32-bit value
+```
+
+- `GET /read?addr=K4M100` returns `{"values":[43981]}` — one value, always a single-element array.
+- `POST /write?addr=K4M100` with `{"values":[43981]}` writes the 16 bits `M100`–`M115`.
+- `sint=true` sign-extends at the K width: `K4M100&sint=true` yields `-32768..32767`, `K2M100&sint=true` yields `-128..127`. On write, values outside the width return `400 bad_request` (e.g. `16` for `K1`, `-1` without `sint`).
+- Supported for bit devices only. `K4D100` (a word device) returns `400 bad_request`.
+- `count` is not supported — one request reads or writes exactly one packed value. Use `K5`–`K8` for values wider than 16 bits rather than `dword=true`, which is rejected.
+- `K0`, `K9` and above return `400 bad_request`, as does combining K notation with bit access (`K4M100.1`).
+- Only `/read` and `/write` accept K notation. `/random-read` and `/random-write` reject it with `400 bad_request` rather than silently reading the base device.
+
+> **Performance note:** a K read is one `ReadBits` (0x0401) and a K write is one `WriteBits`, so unlike word-device bit access there is no read-modify-write penalty.
+
 ## Error Responses
 
 Errors are returned as JSON. Every error response includes both the HTTP status code and a machine-readable `code` in the body.
