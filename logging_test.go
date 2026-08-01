@@ -180,10 +180,46 @@ func TestLogRequestsDurationMs(t *testing.T) {
 	}
 }
 
+// TestRunIDOnStateEventsOnly pins run_id to state events. Request logs are the
+// bulk of the file and are contiguous in time, so they must stay narrow.
+func TestRunIDOnStateEventsOnly(t *testing.T) {
+	var capturedAttrs []slog.Attr
+	h := &attrCaptureHandler{attrs: &capturedAttrs}
+	orig := slog.Default()
+	slog.SetDefault(slog.New(h))
+	t.Cleanup(func() { slog.SetDefault(orig) })
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	logRequests(handler).ServeHTTP(httptest.NewRecorder(), req)
+	for _, a := range capturedAttrs {
+		if a.Key == "run_id" {
+			t.Errorf("request log carries run_id; it belongs on state events only")
+		}
+	}
+
+	capturedAttrs = nil
+	logState("PLC connected", "host", "192.168.0.10")
+	var found bool
+	for _, a := range capturedAttrs {
+		if a.Key == "run_id" {
+			found = true
+			if got := a.Value.String(); got != runID {
+				t.Errorf("run_id = %q, want %q", got, runID)
+			}
+		}
+	}
+	if !found {
+		t.Error("state event is missing run_id")
+	}
+}
+
 func TestStateEventHandlerWritesOnlyStateInfoBelowThreshold(t *testing.T) {
 	var buf bytes.Buffer
 	base := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})
-	logger := slog.New(newStateEventHandler(base)).With("run_id", "test-run")
+	logger := slog.New(newStateEventHandler(base))
 
 	logger.Info("request", "status", http.StatusOK)
 	if buf.Len() != 0 {
@@ -195,7 +231,7 @@ func TestStateEventHandlerWritesOnlyStateInfoBelowThreshold(t *testing.T) {
 	if !strings.Contains(got, "msg=\"PLC reconnected\"") {
 		t.Errorf("state event missing from file log: %s", got)
 	}
-	if !strings.Contains(got, "kind=state") || !strings.Contains(got, "run_id=test-run") {
+	if !strings.Contains(got, "kind=state") || !strings.Contains(got, "run_id="+runID) {
 		t.Errorf("state event identifiers missing: %s", got)
 	}
 
@@ -238,7 +274,7 @@ func (h *levelCaptureHandler) Handle(_ context.Context, r slog.Record) error {
 	return nil
 }
 func (h *levelCaptureHandler) WithAttrs(_ []slog.Attr) slog.Handler { return h }
-func (h *levelCaptureHandler) WithGroup(_ string) slog.Handler       { return h }
+func (h *levelCaptureHandler) WithGroup(_ string) slog.Handler      { return h }
 
 // attrCaptureHandler collects all slog attributes from the last record.
 type attrCaptureHandler struct{ attrs *[]slog.Attr }
@@ -253,4 +289,4 @@ func (h *attrCaptureHandler) Handle(_ context.Context, r slog.Record) error {
 	return nil
 }
 func (h *attrCaptureHandler) WithAttrs(_ []slog.Attr) slog.Handler { return h }
-func (h *attrCaptureHandler) WithGroup(_ string) slog.Handler       { return h }
+func (h *attrCaptureHandler) WithGroup(_ string) slog.Handler      { return h }

@@ -3,14 +3,22 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"net/http"
+	"os"
 	"sync/atomic"
 	"time"
 
 	mc "github.com/moge800/gomcprotocol"
 )
+
+// runID identifies one process run so that state transitions in an append-only
+// log file can be grouped by restart. It is attached to state events only:
+// request logs are contiguous in time, so carrying it on every line would just
+// make the common case wider.
+var runID = fmt.Sprintf("%d-%d", os.Getpid(), time.Now().UnixNano())
 
 type plcLatencyKey struct{}
 
@@ -129,7 +137,7 @@ func logStateWarn(msg string, args ...any) {
 }
 
 func logStateAt(logger *slog.Logger, level slog.Level, msg string, args ...any) {
-	logger.Log(context.Background(), level, msg, append([]any{"kind", stateLogKind}, args...)...)
+	logger.Log(context.Background(), level, msg, append([]any{"run_id", runID, "kind", stateLogKind}, args...)...)
 }
 
 // logPLCOp logs a single PLC operation result via slog.
@@ -209,7 +217,7 @@ func logRequests(h http.Handler) http.Handler {
 			"path", r.URL.Path,
 			"query", capLogQuery(r.URL.RawQuery),
 			"status", rec.status,
-			"duration_ms", math.Round(float64(time.Since(start).Nanoseconds())/1e6*100)/100,
+			"duration_ms", math.Round(float64(time.Since(start).Nanoseconds())/1e6*100) / 100,
 		}
 		if ms, ok := plcLatencyMs(r.Context()); ok {
 			attrs = append(attrs, "plc_latency_ms", ms)
