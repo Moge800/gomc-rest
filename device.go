@@ -59,7 +59,7 @@ type ParsedAddr struct {
 
 func parseAddr(s string) (ParsedAddr, error) {
 	s = strings.ToUpper(strings.TrimSpace(s))
-	full := s // preserved so errors quote what the caller actually passed
+	full := s // whole normalized address, so errors still quote it after the K prefix is stripped
 
 	// K notation packs consecutive bit devices into one integer, e.g. K4M100
 	// covers M100–M115 as a single 16-bit value. Strip the "K<n>" prefix and
