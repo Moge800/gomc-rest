@@ -48,8 +48,7 @@ func main() {
 		handler = &teeHandler{handlers: []slog.Handler{charmLogger, fileHandler}}
 	}
 	log.SetOutput(logOut)
-	runID := fmt.Sprintf("%d-%d", os.Getpid(), time.Now().UnixNano())
-	slog.SetDefault(slog.New(handler).With("run_id", runID))
+	slog.SetDefault(slog.New(handler))
 
 	plc := newConfiguredPLCClient(cfg)
 	plcQueue := newPLCQueue(plc, cfg.QueueSize)
