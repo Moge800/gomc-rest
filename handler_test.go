@@ -290,8 +290,8 @@ func TestListenAddrs(t *testing.T) {
 	}{
 		{"192.168.1.10:8080", 1, "192.168.1.10:8080"},
 		{"127.0.0.1:8080", 1, "127.0.0.1:8080"},
-		{":8080", -1, ""},      // may be nil in environments with no non-loopback IPv4
-		{"[::]:8080", -1, ""},  // same
+		{":8080", -1, ""},     // may be nil in environments with no non-loopback IPv4
+		{"[::]:8080", -1, ""}, // same
 		{"not-valid", -2, ""},
 	}
 	for _, tc := range cases {
@@ -676,13 +676,22 @@ func (m *mockConn) ReadBits(device string, start, count int) ([]bool, error) {
 	}
 	return out, nil
 }
-func (m *mockConn) WriteBits(_ string, _ int, _ []bool) error         { return nil }
-func (m *mockConn) RemoteRun(_ int, _ bool) error                     { return nil }
-func (m *mockConn) RemoteStop() error                                  { return nil }
-func (m *mockConn) RemotePause(_ bool) error                           { return nil }
-func (m *mockConn) RemoteLatchClear() error                            { return nil }
-func (m *mockConn) RemoteReset() error                                 { return nil }
-func (m *mockConn) Close() error                                       { return nil }
+func (m *mockConn) WriteBits(device string, start int, values []bool) error {
+	for i, v := range values {
+		var w uint16
+		if v {
+			w = 1
+		}
+		m.words[device+strconv.Itoa(start+i)] = w
+	}
+	return nil
+}
+func (m *mockConn) RemoteRun(_ int, _ bool) error { return nil }
+func (m *mockConn) RemoteStop() error             { return nil }
+func (m *mockConn) RemotePause(_ bool) error      { return nil }
+func (m *mockConn) RemoteLatchClear() error       { return nil }
+func (m *mockConn) RemoteReset() error            { return nil }
+func (m *mockConn) Close() error                  { return nil }
 func (m *mockConn) RandomRead(words, dwords []mc.DeviceAddr) ([]uint16, []uint32, error) {
 	wVals := make([]uint16, len(words))
 	for i, da := range words {
@@ -1835,6 +1844,228 @@ func TestHandleRandomRead(t *testing.T) {
 		}
 		if !strings.HasSuffix(req.URL.RawQuery, "...") {
 			t.Errorf("RawQuery should end with '...', got %q", req.URL.RawQuery)
+		}
+	})
+}
+
+func TestHandleReadKNotation(t *testing.T) {
+	// M100..M103 = 1,0,1,1 → K1M100 = 0b1101 = 13
+	q := newMockPLCQueue(t, map[string]uint16{
+		"M100": 1, "M101": 0, "M102": 1, "M103": 1,
+		"M115": 1, // top bit of K4M100
+	})
+
+	t.Run("packs bits LSB-first", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/read?addr=K1M100", nil)
+		rec := httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			Values []int64 `json:"values"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(resp.Values) != 1 || resp.Values[0] != 0b1101 {
+			t.Errorf("values = %v, want [13]", resp.Values)
+		}
+	})
+
+	t.Run("K4 spans 16 bits", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/read?addr=K4M100", nil)
+		rec := httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			Values []int64 `json:"values"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		want := int64(0b1000_0000_0000_1101) // M115 set plus M100,M102,M103
+		if len(resp.Values) != 1 || resp.Values[0] != want {
+			t.Errorf("values = %v, want [%d]", resp.Values, want)
+		}
+	})
+
+	t.Run("sint sign-extends at the K width", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/read?addr=K4M100&sint=true", nil)
+		rec := httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			Values []int64 `json:"values"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		// 0x800D as a signed 16-bit value
+		want := int64(-32755)
+		if len(resp.Values) != 1 || resp.Values[0] != want {
+			t.Errorf("values = %v, want [%d]", resp.Values, want)
+		}
+	})
+
+	rejected := []struct {
+		name string
+		url  string
+	}{
+		{"count not supported", "/read?addr=K4M100&count=2"},
+		{"dword not supported", "/read?addr=K4M100&dword=true"},
+		{"word device rejected", "/read?addr=K4D100"},
+		{"nibble count 9 rejected", "/read?addr=K9M100"},
+		{"bit suffix combination rejected", "/read?addr=K4M100.1"},
+	}
+	for _, tc := range rejected {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.url, nil)
+			rec := httptest.NewRecorder()
+			handleRead(q)(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want 400 (body: %s)", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestHandleWriteKNotation(t *testing.T) {
+	t.Run("unpacks value across bit devices", func(t *testing.T) {
+		words := map[string]uint16{}
+		q := newMockPLCQueue(t, words)
+		req := httptest.NewRequest(http.MethodPost, "/write?addr=K1M100",
+			strings.NewReader(`{"values":[13]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleWrite(q, false)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		// 13 = 0b1101 → M100=1, M101=0, M102=1, M103=1
+		for dev, want := range map[string]uint16{"M100": 1, "M101": 0, "M102": 1, "M103": 1} {
+			if got := words[dev]; got != want {
+				t.Errorf("%s = %d, want %d", dev, got, want)
+			}
+		}
+	})
+
+	t.Run("round-trips through read", func(t *testing.T) {
+		q := newMockPLCQueue(t, map[string]uint16{})
+		req := httptest.NewRequest(http.MethodPost, "/write?addr=K4M200",
+			strings.NewReader(`{"values":[43981]}`)) // 0xABCD
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleWrite(q, false)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("write status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		req = httptest.NewRequest(http.MethodGet, "/read?addr=K4M200", nil)
+		rec = httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		var resp struct {
+			Values []int64 `json:"values"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(resp.Values) != 1 || resp.Values[0] != 43981 {
+			t.Errorf("values = %v, want [43981]", resp.Values)
+		}
+	})
+
+	t.Run("negative value with sint round-trips", func(t *testing.T) {
+		q := newMockPLCQueue(t, map[string]uint16{})
+		req := httptest.NewRequest(http.MethodPost, "/write?addr=K4M300&sint=true",
+			strings.NewReader(`{"values":[-2]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleWrite(q, false)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("write status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
+		req = httptest.NewRequest(http.MethodGet, "/read?addr=K4M300&sint=true", nil)
+		rec = httptest.NewRecorder()
+		handleRead(q)(rec, req)
+		var resp struct {
+			Values []int64 `json:"values"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(resp.Values) != 1 || resp.Values[0] != -2 {
+			t.Errorf("values = %v, want [-2]", resp.Values)
+		}
+	})
+
+	rejected := []struct {
+		name string
+		url  string
+		body string
+	}{
+		{"value too large for width", "/write?addr=K1M100", `{"values":[16]}`},
+		{"negative without sint", "/write?addr=K4M100", `{"values":[-1]}`},
+		{"sint out of range", "/write?addr=K4M100&sint=true", `{"values":[32768]}`},
+		{"multiple values rejected", "/write?addr=K4M100", `{"values":[1,2]}`},
+		{"empty values rejected", "/write?addr=K4M100", `{"values":[]}`},
+		{"booleans rejected", "/write?addr=K4M100", `{"values":[true]}`},
+		{"dword not supported", "/write?addr=K4M100&dword=true", `{"values":[1]}`},
+		{"word device rejected", "/write?addr=K4D100", `{"values":[1]}`},
+	}
+	for _, tc := range rejected {
+		t.Run(tc.name, func(t *testing.T) {
+			q := newMockPLCQueue(t, map[string]uint16{})
+			req := httptest.NewRequest(http.MethodPost, tc.url, strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			handleWrite(q, false)(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want 400 (body: %s)", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+// TestKNotationRejectedOnRandomEndpoints guards against K notation being
+// silently parsed as a plain bit device by /random-read and /random-write,
+// which would read or write the wrong devices.
+func TestKNotationRejectedOnRandomEndpoints(t *testing.T) {
+	q := newMockPLCQueue(t, map[string]uint16{"M100": 1})
+
+	t.Run("random-read bits", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/random-read",
+			strings.NewReader(`{"bits":["K4M100"]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomRead(q)(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400 (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("random-write bits", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/random-write",
+			strings.NewReader(`{"bits":[{"addr":"K4M100","value":true}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomWrite(q, false)(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400 (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("random-read words", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/random-read",
+			strings.NewReader(`{"words":["K4M100"]}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handleRandomRead(q)(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400 (body: %s)", rec.Code, rec.Body.String())
 		}
 	})
 }

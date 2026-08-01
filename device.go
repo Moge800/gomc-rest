@@ -46,17 +46,35 @@ var multiCharPrefixes = func() []string {
 	return ps
 }()
 
-// ParsedAddr extends mc.DeviceAddr with an optional bit index for word devices.
+// ParsedAddr extends mc.DeviceAddr with an optional bit index for word devices
+// and an optional nibble count for K notation.
 // Bit == -1 means no bit access; 0–15 means access that bit of the word register.
+// Nibbles == 0 means no K notation; 1–8 means pack that many nibbles
+// (Nibbles*4 consecutive bit devices) into a single integer.
 type ParsedAddr struct {
 	mc.DeviceAddr
-	Bit int
+	Bit     int
+	Nibbles int
 }
 
 func parseAddr(s string) (ParsedAddr, error) {
 	s = strings.ToUpper(strings.TrimSpace(s))
+	full := s // whole normalized address, so errors still quote it after the K prefix is stripped
+
+	// K notation packs consecutive bit devices into one integer, e.g. K4M100
+	// covers M100–M115 as a single 16-bit value. Strip the "K<n>" prefix and
+	// parse the remainder as an ordinary device address.
+	nibbles := 0
+	if len(s) > 2 && s[0] == 'K' && s[1] >= '0' && s[1] <= '9' {
+		if s[1] < '1' || s[1] > '8' {
+			return ParsedAddr{}, fmt.Errorf("invalid nibble count in %q: K notation supports K1 through K8", s)
+		}
+		nibbles = int(s[1] - '0')
+		s = s[2:]
+	}
+
 	if len(s) < 2 {
-		return ParsedAddr{}, fmt.Errorf("invalid device address: %q", s)
+		return ParsedAddr{}, fmt.Errorf("invalid device address: %q", full)
 	}
 
 	var dev string
@@ -103,6 +121,13 @@ func parseAddr(s string) (ParsedAddr, error) {
 		}
 	}
 
+	// K notation is a bit-device packing, so a word device is a caller error.
+	// A bit suffix cannot reach here alongside it: the .N block above already
+	// rejects .N on bit devices, and word devices are rejected right here.
+	if nibbles > 0 && wordDevs[dev] {
+		return ParsedAddr{}, fmt.Errorf("K notation is only supported for bit devices, not %q", dev)
+	}
+
 	var addr int
 	if hexAddrDevs[dev] {
 		n, err := strconv.ParseInt(addrPart, 16, 64)
@@ -118,7 +143,7 @@ func parseAddr(s string) (ParsedAddr, error) {
 		addr = n
 	}
 
-	return ParsedAddr{DeviceAddr: mc.DeviceAddr{Device: dev, Addr: addr}, Bit: bit}, nil
+	return ParsedAddr{DeviceAddr: mc.DeviceAddr{Device: dev, Addr: addr}, Bit: bit, Nibbles: nibbles}, nil
 }
 
 func isWordDevice(dev string) bool {
